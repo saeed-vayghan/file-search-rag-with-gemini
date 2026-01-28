@@ -1,0 +1,16 @@
+{
+    "project": {
+        "name": "AI Agents Party",
+        "description": "Mitra Agents System"
+    },
+    "memory": {
+        "file": ".gemini/GEMINI.md"
+    },
+    "commands": {
+        "root": ".gemini/commands"
+    },
+    "agent": {
+        "name": "Antigravity",
+        "language": "en"
+    }
+}

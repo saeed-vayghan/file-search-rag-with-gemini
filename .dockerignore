@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Next.js build output
+.next
+out
+
+# Version control
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Docs and local files
+*.md
+docs/
+mitra/
+poc/
+SESSION_PROMPTS.md
+
+# Docker files (no need to copy into image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# User uploads (not needed in Docker image)
+uploads/

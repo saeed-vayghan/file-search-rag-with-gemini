@@ -1,0 +1,137 @@
+export type Locale = "en" | "fa";
+
+export type Dictionary = {
+    nav: {
+        dashboard: string;
+        search: string;
+        libraries: string;
+        store: string;
+        settings: string;
+        activity: string;
+    };
+    upload: {
+        title: string;
+        dragDrop: string;
+        chooseFile: string;
+        supports: string;
+        uploading: string;
+        complete: string;
+        failed: string;
+        tryAgain: string;
+        selectLibrary: string;
+        noLibrary: string;
+        browse: string;
+        supportedFormats: string;
+        largeFileWait: string;
+        success: string;
+    };
+    chat: {
+        placeholder: string;
+        searching: string;
+        startPrompt: string;
+        tip: string;
+        preview: string;
+        info: string;
+        fileNotFound: string;
+        returnDashboard: string;
+        size: string;
+        uploaded: string;
+        readyForSearch: string;
+        processing: string;
+        indexedSearchable: string;
+        ingestionInProgress: string;
+        download: string;
+        defaultTitle: string;
+        defaultSubtitle: string;
+        warning: string;
+        deleteHistory: string;
+        sources: string;
+        modeLimited: string;
+        modeAuxiliary: string;
+    };
+    dashboard: {
+        welcome: string;
+        welcomeDesc: string;
+        storageUsed: string;
+        totalDocs: string;
+        recentFiles: string;
+        noFiles: string;
+        uploadFirst: string;
+        name: string;
+        type: string;
+        date: string;
+        sizeCol: string;
+        status: string;
+        library: string;
+    };
+    libraries: {
+        title: string;
+        newLibrary: string;
+        noLibraries: string;
+        noLibrariesDesc: string;
+        createLibrary: string;
+        documents: string;
+        document: string;
+        deleteTitle: string;
+        deleteConfirm: string;
+        create: string;
+    };
+    createLibrary: {
+        title: string;
+        subtitle: string;
+        nameLabel: string;
+        namePlaceholder: string;
+        iconLabel: string;
+        colorLabel: string;
+        cancel: string;
+        create: string;
+    };
+    actions: {
+        upload: string;
+        create: string;
+        delete: string;
+        cancel: string;
+        checkStatus: string;
+        chat: string;
+        deleteConfirm: string;
+    };
+    common: {
+        loading: string;
+        error: string;
+        save: string;
+        cancel: string;
+        delete: string;
+        confirm: string;
+        retry: string;
+    };
+    settings: {
+        title: string;
+        language: string;
+        languageDesc: string;
+        profile: string;
+        name: string;
+        email: string;
+        saveChanges: string;
+        apiConfig: string;
+        googleApiKey: string;
+        apiKeyHelp: string;
+        preferences: string;
+        notifications: string;
+        comingSoon: string;
+    };
+    dangerZone: {
+        title: string;
+        description: string;
+        warningTitle: string;
+        warningText: string;
+        button: string;
+        confirmTitle: string;
+        confirmText: string;
+        confirmButton: string;
+        cancelButton: string;
+        successTitle: string;
+        successMessage: string;
+        errorTitle: string;
+        errorMessage: string;
+    };
+};

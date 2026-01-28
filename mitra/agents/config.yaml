@@ -1,0 +1,7 @@
+# Analyst Agent Configuration
+# Fill in these values before running the agent.
+
+user_name: "Saeed"
+communication_language: "English"
+project_name: "File Search"
+project_id: "file-search"
