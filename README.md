@@ -2,6 +2,9 @@
 
 A powerful, AI-driven document search and management system powered by **Google Gemini API** and **MongoDB**. This application allows users to upload, organize, and perform semantic search (RAG) on their documents with high precision.
 
+### [MITRA ORCHESTRATION SHOWCASE](MITRA_ORCHESTRATION_SHOWCASE.md)
+Read more to see how [Mitra](https://github.com/saeed-vayghan/mitra) Orchestration helped to develop this application.
+
 ---
 
 ## 🚀 Features
