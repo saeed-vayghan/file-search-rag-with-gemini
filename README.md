@@ -2,6 +2,10 @@
 
 A powerful, AI-driven document search and management system powered by **Google Gemini API** and **MongoDB**. This application allows users to upload, organize, and perform semantic search (RAG) on their documents with high precision.
 
+<div align="center">
+  <img src="docs/consultancy/file-search/images/home.png" alt="File Search Dashboard" width="100%">
+</div>
+
 ### [MITRA ORCHESTRATION SHOWCASE](MITRA_ORCHESTRATION_SHOWCASE.md)
 Read more to see how [Mitra](https://github.com/saeed-vayghan/mitra) Orchestration helped to develop this application.
 
@@ -73,11 +77,19 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 *   **Vector Store**: The underlying Google Cloud resource that holds vector embeddings of your files. Each user has one primary store (e.g., `store-user@example.com`).
 *   **Library**: A logical grouping of files within the application (e.g., "Legal Docs", "Invoices"). This helps you organize files on the UI side, even though they live in the same Vector Store.
 
+<div align="center">
+  <img src="docs/consultancy/file-search/images/file.png" alt="Library View" width="100%">
+</div>
+
 ### 2. Scoped Search
 You can control the context of your AI chats:
 *   **Global Chat**: Searches across *all* your uploaded files.
 *   **Library Chat**: Restricts the search context to files within a specific Library.
 *   **File Chat**: "Talk" to a single file. The AI only sees that specific document.
+
+<div align="center">
+  <img src="docs/consultancy/file-search/images/chat.png" alt="Chat Interface" width="100%">
+</div>
 
 ### 3. Search Modes
 Located in the Chat Settings, you can tune the AI's behavior:
