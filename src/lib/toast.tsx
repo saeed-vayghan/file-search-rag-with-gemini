@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MESSAGES } from "@/config/constants";
 
 export interface Toast {
     id: string;
@@ -83,7 +84,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function useToast() {
     const context = useContext(ToastContext);
     if (!context) {
-        throw new Error("useToast must be used within a ToastProvider");
+        throw new Error(MESSAGES.ERRORS.USE_TOAST_CONTEXT);
     }
     return context;
 }

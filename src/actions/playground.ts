@@ -2,9 +2,11 @@
 
 import { GoogleGenAI } from "@google/genai";
 import vm from "vm";
+import { withAuth } from "@/lib/auth-middleware";
+import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
 
 if (!process.env.GOOGLE_API_KEY) {
-    throw new Error("GOOGLE_API_KEY is not defined");
+    throw new Error(MESSAGES.ERRORS.GOOGLE_API_KEY_MISSING);
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
@@ -18,7 +20,6 @@ export interface PlaygroundResult {
 }
 
 
-import { withAuth } from "@/lib/auth-middleware";
 
 export const executePlaygroundCode = withAuth(async (user, code: string): Promise<PlaygroundResult> => {
     const logs: string[] = [];
@@ -68,7 +69,7 @@ export const executePlaygroundCode = withAuth(async (user, code: string): Promis
         };
 
     } catch (error: any) {
-        console.error("Playground Execution Error:", error);
+        console.error(LOG_MESSAGES.PLAYGROUND.EXECUTION_ERROR, error);
         return {
             success: false,
             error: error.message || String(error),

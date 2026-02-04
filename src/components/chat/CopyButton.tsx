@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LOG_MESSAGES } from "@/config/constants";
 
 interface CopyButtonProps {
     content: string;
@@ -21,7 +22,7 @@ export function CopyButton({ content, className }: CopyButtonProps) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
-            console.error("Failed to copy:", err);
+            console.error(LOG_MESSAGES.UI.CLIPBOARD_FAIL, err);
         }
     };
 

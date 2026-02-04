@@ -7,6 +7,7 @@ import { Trash2, Loader2, X } from "lucide-react";
 import { deleteChatHistoryAction } from "@/actions/chat-actions";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { LOG_MESSAGES } from "@/config/constants";
 
 interface DeleteHistoryModalProps {
     fileId: string;
@@ -35,7 +36,7 @@ export function DeleteHistoryModal({ fileId, isOpen, onClose, onDeleted }: Delet
             onDeleted();
             onClose();
         } catch (error) {
-            console.error("Delete failed", error);
+            console.error(LOG_MESSAGES.UI.DELETE_FAIL, error);
         } finally {
             setIsLoading(false);
         }

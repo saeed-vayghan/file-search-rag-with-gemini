@@ -3,6 +3,7 @@ import { readFile, stat } from "fs/promises";
 import { join } from "path";
 import connectToDatabase from "@/lib/db";
 import FileModel from "@/models/File";
+import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
 
 export async function GET(
     request: NextRequest,
@@ -15,11 +16,11 @@ export async function GET(
         const file = await FileModel.findById(id);
 
         if (!file) {
-            return NextResponse.json({ error: "File not found" }, { status: 404 });
+            return NextResponse.json({ error: MESSAGES.ERRORS.FILE_NOT_FOUND }, { status: 404 });
         }
 
         if (!file.localPath) {
-            return NextResponse.json({ error: "File not available for preview" }, { status: 404 });
+            return NextResponse.json({ error: MESSAGES.ERRORS.PREVIEW_NOT_AVAILABLE }, { status: 404 });
         }
 
         // Get the absolute path to the file
@@ -29,7 +30,7 @@ export async function GET(
         try {
             await stat(absolutePath);
         } catch {
-            return NextResponse.json({ error: "File not found on disk" }, { status: 404 });
+            return NextResponse.json({ error: MESSAGES.ERRORS.FILE_NOT_FOUND_ON_DISK }, { status: 404 });
         }
 
         // Read the file
@@ -44,7 +45,7 @@ export async function GET(
             },
         });
     } catch (error) {
-        console.error("File API Error:", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        console.error(LOG_MESSAGES.API.FILE_FAIL, error);
+        return NextResponse.json({ error: MESSAGES.ERRORS.INTERNAL_SERVER_ERROR }, { status: 500 });
     }
 }

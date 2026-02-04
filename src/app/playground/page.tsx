@@ -8,6 +8,7 @@ import { ResultViewer } from "./_components/ResultViewer";
 import { Button } from "@/components/ui/button";
 import { Play, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MESSAGES, LOG_MESSAGES, PATHS } from "@/config/constants";
 
 export default function PlaygroundPage() {
     const [selectedScenario, setSelectedScenario] = useState<PlaygroundScenario>(PLAYGROUND_SCENARIOS[0]);
@@ -37,7 +38,7 @@ export default function PlaygroundPage() {
                 setResult(res);
             }
         } catch (e) {
-            console.error("Run failed:", e);
+            console.error(LOG_MESSAGES.API.RUN_FAIL, e);
         } finally {
             setIsRunning(false);
         }

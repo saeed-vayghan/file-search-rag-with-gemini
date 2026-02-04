@@ -43,6 +43,7 @@ export const PATHS = {
 
 export const MESSAGES = {
     ERRORS: {
+        UNAUTHORIZED: "Unauthorized: Please sign in to continue",
         NO_STORE: "No document store found. Please upload a document first.",
         INVALID_STORE: "Store record is invalid (missing Google ID).",
         GENERIC_ERROR: "Failed to process your question. Please try again.",
@@ -51,15 +52,55 @@ export const MESSAGES = {
         NAME_EMPTY: "Name cannot be empty",
         UPDATE_SETTINGS_FAILED: "Failed to update settings",
         UPDATE_PROFILE_FAILED: "Failed to update profile",
+        NO_FILE: "No file provided",
+        USER_NOT_FOUND: "User not found",
+        UPLOAD_FAILED: "Upload failed",
+        CREATE_LIB_FAILED: "Failed to create library",
+        LIB_NOT_FOUND: "Library not found",
+        UPDATE_LIB_FAILED: "Failed to update library",
+        DELETE_LIB_FAILED: "Failed to delete library",
+        FILE_NOT_FOUND: "File not found",
+        CHECK_STATUS_FAILED: "Failed to check status",
+        DELETE_FILE_FAILED: "Failed to delete file",
+        FILE_NOT_FOUND_REMOTE: "File not found on remote (Zombie/Ghost)",
+        INSPECT_REMOTE_FAILED: "Failed to inspect remote file",
+        NO_STORE_FOUND: "No store found",
+        STORE_RECORD_MISSING: "Store record missing",
+        FETCH_STORE_STATUS_FAILED: "Failed to fetch store status",
+        PURGE_FAILED: "Failed to complete purge operation.",
+        GOOGLE_API_KEY_MISSING: "GOOGLE_API_KEY is not defined",
+        GOOGLE_CREDENTIALS_MISSING: "Missing Google OAuth credentials in environment variables",
+        GOOGLE_STORE_CREATION_FAILED: "Failed to create Google AI store",
+        SEARCH_TIMEOUT: "Search request timed out. Please try again or refine your query.",
+        USE_TOAST_CONTEXT: "useToast must be used within a ToastProvider",
+        USE_I18N_CONTEXT: "useI18n must be used within an I18nProvider",
+        MONGODB_URI_MISSING: "Please define the MONGODB_URI environment variable inside .env.local",
+        PREVIEW_NOT_AVAILABLE: "File not available for preview",
+        FILE_NOT_FOUND_ON_DISK: "File not found on disk",
+        INTERNAL_SERVER_ERROR: "Internal server error",
+        INGESTION_FAILED: "Ingestion failed",
     },
     INFO: {
-        NO_RELEVANT_INFO: "I couldn't find relevant information in your documents."
+        NO_RELEVANT_INFO: "I couldn't find relevant information in your documents.",
+        STILL_PROCESSING: "Still processing...",
+    },
+    SUCCESS: {
+        LIBRARY_DELETED: "Library and all files deleted",
+        FILE_READY: "File is now ready for search",
     }
 } as const;
 
 export const LOG_MESSAGES = {
+    API: {
+        FILE_FAIL: "File API Error:",
+        RUN_FAIL: "Run failed:",
+    },
     AUTH: {
-        ACTION_FAILED: "[AuthMiddleware] Action failed:"
+        ACTION_FAILED: "[AuthMiddleware] Action failed:",
+        SIGN_IN_ERROR: "[Auth] Sign-in error:",
+        NEW_USER: "[Auth] New user sign-in:",
+        USER_CREATED: "[Auth] User created:",
+        USER_LOGGED_IN: "[Auth] User logged in:",
     },
     USER: {
         FETCH_SETTINGS_FAIL: "Failed to fetch settings:",
@@ -92,6 +133,30 @@ export const LOG_MESSAGES = {
         GET_STORE_STATUS_FAIL: "Get Store Status Failed:",
         PURGE_FAIL: "Purge Action Failed:",
         PURGE_LOCAL_FAIL: "   [FS] Failed to delete local directory (might not exist):"
+    },
+    GOOGLE: {
+        UPLOAD_FAIL: "[GoogleAI] Upload Failed:",
+        STORE_CREATE_FAIL: "[GoogleAI] Store Creation Failed:",
+        INGEST_START_FAIL: "[GoogleAI] Ingestion Start Failed:",
+        OP_STATUS_FAIL: "[GoogleAI] Operation Status Check Failed:",
+        SEARCH_FAIL: "[GoogleAI] Search Failed",
+        TIMEOUT_ERROR: "[GoogleAI] Network/Timeout Error detected. The request took too long or connection was dropped.",
+        DELETE_FAIL: "[GoogleAI] Delete Failed:",
+        DOC_DELETE_FAIL: "[GoogleAI] Failed to delete document from store (non-critical):",
+        INSPECT_FAIL: "[GoogleAI] Inspection Failed:",
+        STORE_META_FAIL: "[GoogleAI] Store Meta Fetch Failed:",
+        STORE_DELETE_FAIL: "   [GoogleAI] Failed to delete store",
+        STORE_LIST_FAIL: "   [GoogleAI] Error listing stores for purge:",
+        FILE_DELETE_FAIL: "   [GoogleAI] Failed to delete file",
+        FILE_LIST_FAIL: "   [GoogleAI] Error listing files for purge:",
+    },
+    PLAYGROUND: {
+        EXECUTION_ERROR: "Playground Execution Error:"
+    },
+    UI: {
+        DELETE_FAIL: "Delete failed:",
+        CLIPBOARD_FAIL: "Failed to copy to clipboard:",
+        LOCALE_WARN: "Locale change ignored in ForceEnglishWrapper",
     }
 } as const;
 

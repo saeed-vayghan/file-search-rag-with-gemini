@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import connectToDatabase from "./db";
 import User from "@/models/User";
 import type { IUser } from "@/models/User";
+import { MESSAGES } from "@/config/constants";
 
 /**
  * Get the authenticated user from the current session.
@@ -31,7 +32,7 @@ export async function requireAuth(): Promise<IUser> {
     const user = await getAuthenticatedUser();
 
     if (!user) {
-        throw new Error("Unauthorized: Please sign in to continue");
+        throw new Error(MESSAGES.ERRORS.UNAUTHORIZED);
     }
 
     return user;

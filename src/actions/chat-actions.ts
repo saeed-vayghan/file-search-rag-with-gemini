@@ -3,7 +3,7 @@
 import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
-import { GoogleAIService } from "@/lib/google-ai";
+import * as GoogleAIService from "@/lib/google-ai";
 import { logChatRequest, logChatResponse, logDebug } from "@/lib/logger";
 import { withAuth } from "@/lib/auth-middleware";
 import Message from "@/models/Message";

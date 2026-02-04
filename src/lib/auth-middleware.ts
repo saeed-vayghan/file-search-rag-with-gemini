@@ -1,7 +1,6 @@
 import connectToDatabase from "@/lib/db";
 import { getAuthenticatedUser } from "./auth-helpers";
 import type { IUser } from "@/models/User";
-
 import { PATHS, LOG_MESSAGES } from "@/config/constants";
 
 /**

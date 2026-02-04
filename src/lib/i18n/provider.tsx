@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { Locale, Dictionary } from "./types";
 import { en } from "./en";
 import { fa } from "./fa";
+import { MESSAGES } from "@/config/constants";
 
 const dictionaries: Record<Locale, Dictionary> = { en, fa };
 
@@ -76,7 +77,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 export function useI18n() {
     const context = useContext(I18nContext);
     if (!context) {
-        throw new Error("useI18n must be used within an I18nProvider");
+        throw new Error(MESSAGES.ERRORS.USE_I18N_CONTEXT);
     }
     return context;
 }

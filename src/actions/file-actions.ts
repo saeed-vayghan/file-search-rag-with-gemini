@@ -5,14 +5,16 @@ import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
 import Store from "@/models/Store";
-import { GoogleAIService } from "@/lib/google-ai";
+import * as GoogleAIService from "@/lib/google-ai";
 import { logInfo, logDangerousOperation, logDebug } from "@/lib/logger";
-import { withAuth, withOptionalAuth } from "@/lib/auth-middleware";
+import { withAuth } from "@/lib/auth-middleware";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
-import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES } from "@/config/constants";
+import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
+import { validateFileSize, validateStoreCapacity } from "@/lib/file-logic";
+import Message from "@/models/Message";
 
 
 export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
@@ -43,88 +45,156 @@ export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?
 });
 
 
-export const uploadFileAction = withAuth(async (user, formData: FormData) => {
-    const file = formData.get("file") as File | null;
-    let libraryId = formData.get("libraryId") as string;
-    const contentHash = formData.get("contentHash") as string;
-
-    // Rule: Uncategorized files are not allowed.
-    if (!libraryId || libraryId === "null" || libraryId === "undefined") {
-        // Find or Create Default Library
-        let defaultLib = await Library.findOne({ userId: user._id, name: LIBRARY_DEFAULTS.NAME });
-        if (!defaultLib) {
-            defaultLib = await Library.create({
-                userId: user._id,
-                name: LIBRARY_DEFAULTS.NAME,
-                icon: UI_DEFAULTS.LIBRARY.ICON,
-                color: UI_DEFAULTS.LIBRARY.COLOR,
-                description: LIBRARY_DEFAULTS.DESCRIPTION
-            });
-        }
-        libraryId = defaultLib._id.toString();
+/**
+ * Helper: Ensures the user has a valid Store record.
+ * Handles creation and recovery of stores.
+ */
+async function ensureUserStore(user: any) {
+    if (!user.primaryStoreId) {
+        const googleStoreName = await GoogleAIService.createStore(`store-${user.email}`);
+        const store = await Store.create({
+            userId: user._id,
+            googleStoreId: googleStoreName,
+            displayName: `Main Library (${user.email})`,
+        });
+        user.primaryStoreId = store._id;
+        await user.save();
+        return store;
     }
 
+    const store = await Store.findById(user.primaryStoreId);
+    if (!store) {
+        // Recovery: If primaryStoreId exists but Store record is missing
+        const googleStoreName = await GoogleAIService.createStore(`recovery-store-${user.email}`);
+        const newStore = await Store.create({
+            userId: user._id,
+            googleStoreId: googleStoreName,
+            displayName: `Recovered Library (${user.email})`,
+        });
+        user.primaryStoreId = newStore._id;
+        await user.save();
+        return newStore;
+    }
+
+    return store;
+}
+
+/**
+ * Helper: Refactored logic to resolve a valid Library ID.
+ */
+async function resolveLibraryId(user: any, libraryIdCandidate: string | null | undefined): Promise<string> {
+    if (libraryIdCandidate && libraryIdCandidate !== "null" && libraryIdCandidate !== "undefined") {
+        return libraryIdCandidate;
+    }
+
+    // Find or Create Default Library
+    const defaultLib = await Library.findOne({ userId: user._id, name: LIBRARY_DEFAULTS.NAME });
+    if (defaultLib) {
+        return defaultLib._id.toString();
+    }
+
+    const newLib = await Library.create({
+        userId: user._id,
+        name: LIBRARY_DEFAULTS.NAME,
+        icon: UI_DEFAULTS.LIBRARY.ICON,
+        color: UI_DEFAULTS.LIBRARY.COLOR,
+        description: LIBRARY_DEFAULTS.DESCRIPTION
+    });
+    return newLib._id.toString();
+}
+
+/**
+ * Helper: Handles the ingestion process, including self-healing (re-creating store) if needed.
+ */
+async function importFileWithRetry(
+    store: any,
+    googleFileId: string,
+    metadata: { libraryId: string, dbFileId: string },
+    user: any
+): Promise<{ operationName: string, updatedStore?: any }> {
+    try {
+        const opName = await GoogleAIService.importFileToStore(
+            store.googleStoreId,
+            googleFileId,
+            metadata
+        );
+        return { operationName: opName };
+    } catch (error: any) {
+        // Check if Store is missing/expired (403/404)
+        const status = error.status || error.code || error?.error?.code;
+        if (status !== 403 && status !== 404) {
+            throw error; // Not a recoverable error
+        }
+
+        console.warn(LOG_MESSAGES.FILE.UPLOAD_STORE_RETRY);
+
+        // Create new store on Google
+        const newGoogleStoreName = await GoogleAIService.createStore(`resync-store-${user.email}`);
+        if (!newGoogleStoreName) {
+            throw new Error(MESSAGES.ERRORS.GOOGLE_STORE_CREATION_FAILED);
+        }
+
+        // Update Store record
+        store.googleStoreId = newGoogleStoreName;
+        store.lastSyncedAt = new Date();
+        const updatedStore = await store.save();
+
+        // Retry import with new store
+        const opName = await GoogleAIService.importFileToStore(
+            newGoogleStoreName,
+            googleFileId,
+            metadata
+        );
+        return { operationName: opName, updatedStore };
+    }
+}
+
+export const uploadFileAction = withAuth(async (user, formData: FormData) => {
+    const file = formData.get("file") as File | null;
+    const rawLibraryId = formData.get("libraryId") as string;
+    const contentHash = formData.get("contentHash") as string;
+
     if (!file) {
-        return { error: "No file provided" };
+        return { error: MESSAGES.ERRORS.NO_FILE };
     }
 
     let newFileId: string | null = null;
 
     try {
+        // 1. Resolve Dependencies (Concurrent generally safe here, but sequential for logic clarity)
         const userDoc = await User.findById(user._id);
         if (!userDoc) {
-            return { error: "User not found" };
+            return { error: MESSAGES.ERRORS.USER_NOT_FOUND };
         }
 
+        // 2. Validate Limits (Pure Logic)
         const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
         const limits = TIERS[userTier];
 
-        // 1.1 Enforce 100MB per file limit
-        if (file.size > limits.maxFileSizeBytes) {
-            return { error: `File size exceeds the ${limits.name} limit of 100MB` };
+        const sizeCheck = validateFileSize(file.size, limits);
+        if (!sizeCheck.valid) {
+            return { error: sizeCheck.error };
         }
 
-        // 2. Ensure User has a formal Store record
-        let store;
-        if (!user.primaryStoreId) {
-            const googleStoreName = await GoogleAIService.createStore(`store-${user.email}`);
-            store = await Store.create({
-                userId: user._id,
-                googleStoreId: googleStoreName,
-                displayName: `Main Library (${user.email})`,
-            });
-            user.primaryStoreId = store._id as any;
-            await user.save();
-        } else {
-            store = await Store.findById(user.primaryStoreId);
-            if (!store) {
-                // Recovery: If primaryStoreId exists but Store record is missing
-                const googleStoreName = await GoogleAIService.createStore(`recovery-store-${user.email}`);
-                store = await Store.create({
-                    userId: user._id,
-                    googleStoreId: googleStoreName,
-                    displayName: `Recovered Library (${user.email})`,
-                });
-                user.primaryStoreId = store._id as any;
-                await user.save();
-            }
+        // 3. Prepare Environment (I/O)
+        const libraryId = await resolveLibraryId(user, rawLibraryId);
+        let store = await ensureUserStore(user);
+
+        const capacityCheck = validateStoreCapacity(store.sizeBytes, file.size, limits);
+        if (!capacityCheck.valid) {
+            return { error: capacityCheck.error };
         }
 
-        // 2.1 Enforce Tier-level Total Store Limit
-        if (store!.sizeBytes + file.size > limits.maxStoreSizeBytes) {
-            return { error: `Store capacity reached. Your tier (${limits.name}) limit is ${limits.maxStoreSizeBytes / (1024 * 1024 * 1024)}GB.` };
-        }
-
-        // 3. Save to Temp Disk (Required by Google SDK)
+        // 4. Save to Temp Disk
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
         const tempPath = join(tmpdir(), `${Date.now()}-${file.name}`);
         await writeFile(tempPath, buffer);
 
-        // 4. Create DB Entry (Status: UPLOADING)
+        // 5. Database Record Creation (Status: UPLOADING)
         const newFile = await FileModel.create({
             userId: user._id,
-            libraryId: libraryId || undefined,
+            libraryId,
             displayName: file.name,
             mimeType: file.type,
             sizeBytes: file.size,
@@ -133,72 +203,47 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         });
         newFileId = newFile._id.toString();
 
-        // 5. Upload to Google (Raw)
+        // 6. External Service Upload
         const uploadRes = await GoogleAIService.uploadFile(tempPath, file.name, file.type);
 
-        // 6. Start Ingestion with Self-Healing for Expired Stores
-        let opName;
-        try {
-            opName = await GoogleAIService.importFileToStore(
-                store!.googleStoreId,
-                uploadRes.name,
-                { libraryId: libraryId || "default", dbFileId: newFileId! }
-            );
-        } catch (error: any) {
-            // Check if Store is missing/expired (403/404)
-            const status = error.status || error.code || error?.error?.code;
-            if (status === 403 || status === 404) {
-                console.warn(LOG_MESSAGES.FILE.UPLOAD_STORE_RETRY);
+        // 7. Ingestion with Auto-Recovery
+        const { operationName, updatedStore } = await importFileWithRetry(
+            store,
+            uploadRes.name,
+            { libraryId, dbFileId: newFileId! },
+            user
+        );
 
-                // Create new store on Google
-                const newGoogleStoreName = await GoogleAIService.createStore(`resync-store-${user.email}`);
-                if (!newGoogleStoreName) {
-                    throw new Error("Failed to re-sync store: Google AI returned no store identifier");
-                }
-
-                // Update Store record
-                store!.googleStoreId = newGoogleStoreName;
-                store!.lastSyncedAt = new Date();
-                await store!.save();
-
-                // Retry import with new store
-                opName = await GoogleAIService.importFileToStore(
-                    newGoogleStoreName,
-                    uploadRes.name,
-                    { libraryId: libraryId || "default", dbFileId: newFileId! }
-                );
-            } else {
-                throw error; // Re-throw other errors
-            }
+        // If recovery happened, update our local store reference for stats update
+        if (updatedStore) {
+            store = updatedStore;
         }
 
-        // 7. Save file locally for preview
+        // 8. Local Preview Storage
         const ext = file.name.split(".").pop() || "bin";
         const googleFileIdClean = uploadRes.name.replace("files/", "");
         const localFileName = `${newFile._id}_${googleFileIdClean}.${ext}`;
         const userUploadDir = join(process.cwd(), "uploads", user._id.toString());
 
-        // Ensure user directory exists
         const { mkdir } = await import("fs/promises");
         await mkdir(userUploadDir, { recursive: true });
-
         const localFilePath = join(userUploadDir, localFileName);
         await writeFile(localFilePath, buffer);
 
-        // 8. Update DB with Google Refs and Local Path
+        // 9. Finalize File Record
         newFile.status = "INGESTING";
         newFile.googleFileId = uploadRes.name;
         newFile.googleUri = uploadRes.uri;
-        newFile.googleOperationName = opName;
+        newFile.googleOperationName = operationName;
         newFile.localPath = `uploads/${user._id.toString()}/${localFileName}`;
         await newFile.save();
 
-        // 9. Update Store Stats in background
-        store!.sizeBytes += file.size;
-        store!.fileCount += 1;
-        await store!.save();
+        // 10. Update Statistics
+        store.sizeBytes += file.size;
+        store.fileCount += 1;
+        await store.save();
 
-        // 10. Cleanup Temp
+        // 11. Cleanup
         await unlink(tempPath);
 
         revalidatePath(PATHS.HOME);
@@ -217,7 +262,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
             }
         }
 
-        return { error: "Upload failed" };
+        return { error: MESSAGES.ERRORS.UPLOAD_FAILED };
     }
 });
 
@@ -346,7 +391,7 @@ export const createLibraryAction = withAuth(async (user, name: string, icon?: st
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.CREATE_LIB_FAIL, error);
-        return { error: "Failed to create library" };
+        return { error: MESSAGES.ERRORS.CREATE_LIB_FAILED };
     }
 });
 
@@ -356,7 +401,7 @@ export const updateLibraryAction = withAuth(async (user, libraryId: string, name
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
         if (!library) {
-            return { error: "Library not found" };
+            return { error: MESSAGES.ERRORS.LIB_NOT_FOUND };
         }
 
         library.name = name;
@@ -380,7 +425,7 @@ export const updateLibraryAction = withAuth(async (user, libraryId: string, name
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.UPDATE_LIB_FAIL, error);
-        return { error: "Failed to update library" };
+        return { error: MESSAGES.ERRORS.UPDATE_LIB_FAILED };
     }
 });
 
@@ -390,7 +435,7 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
         if (!library) {
-            return { error: "Library not found" };
+            return { error: MESSAGES.ERRORS.LIB_NOT_FOUND };
         }
 
         // Cascade Delete Files
@@ -442,10 +487,10 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
         revalidatePath(PATHS.HOME);
         revalidatePath(PATHS.LIBRARIES);
 
-        return { success: true, message: "Library and all files deleted" };
+        return { success: true, message: MESSAGES.SUCCESS.LIBRARY_DELETED };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.DELETE_LIB_FAIL, error);
-        return { error: "Failed to delete library" };
+        return { error: MESSAGES.ERRORS.DELETE_LIB_FAILED };
     }
 });
 
@@ -464,14 +509,14 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file) {
-            return { error: "File not found" };
+            return { error: MESSAGES.ERRORS.FILE_NOT_FOUND };
         }
 
         // If already ACTIVE or FAILED, no need to check
         if (file.status === FILE_STATUS.ACTIVE || file.status === FILE_STATUS.FAILED) {
             return {
                 status: file.status,
-                message: file.status === FILE_STATUS.ACTIVE ? "File is ready" : "Ingestion failed"
+                message: file.status === FILE_STATUS.ACTIVE ? MESSAGES.SUCCESS.FILE_READY : MESSAGES.ERRORS.INGESTION_FAILED
             };
         }
 
@@ -485,21 +530,19 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
             revalidatePath(PATHS.HOME);
             return {
                 status: FILE_STATUS.ACTIVE,
-                message: "File is now ready for search"
+                message: MESSAGES.SUCCESS.FILE_READY
             };
         }
 
         return {
             status: file.status,
-            message: "Still processing..."
+            message: MESSAGES.INFO.STILL_PROCESSING
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.CHECK_STATUS_FAIL, error);
-        return { error: "Failed to check status" };
+        return { error: MESSAGES.ERRORS.CHECK_STATUS_FAILED };
     }
 });
-
-import Message from "@/models/Message";
 
 
 // Internal helper for usage within other server actions (avoids Auth middleware recursion issues)
@@ -508,7 +551,7 @@ async function deleteFileInternal(user: any, fileId: string) {
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file) {
-            return { error: "File not found" };
+            return { error: MESSAGES.ERRORS.FILE_NOT_FOUND };
         }
 
         // 1. Delete from Google Cloud (Store Document + File)
@@ -576,7 +619,7 @@ async function deleteFileInternal(user: any, fileId: string) {
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.DELETE_FAIL, error);
-        return { error: "Failed to delete file" };
+        return { error: MESSAGES.ERRORS.DELETE_FILE_FAILED };
     }
 }
 
@@ -588,17 +631,17 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file || !file.googleFileId) {
-            return { error: "File not found or no Google ID" };
+            return { error: MESSAGES.ERRORS.FILE_NOT_FOUND };
         }
 
         const remoteMeta = await GoogleAIService.getFile(file.googleFileId);
         if (!remoteMeta) {
-            return { error: "File not found on remote (Zombie/Ghost)" };
+            return { error: MESSAGES.ERRORS.FILE_NOT_FOUND_REMOTE };
         }
 
         return { success: true, metadata: remoteMeta };
     } catch (error) {
-        return { error: "Failed to inspect remote file" };
+        return { error: MESSAGES.ERRORS.INSPECT_REMOTE_FAILED };
     }
 });
 export const getLibraryFilesAction = withAuth(async (user, libraryId: string) => {
@@ -636,12 +679,12 @@ export const getLibraryFilesAction = withAuth(async (user, libraryId: string) =>
 
 export const getStoreStatusAction = withAuth(async (user, force: boolean = false) => {
     if (!user.primaryStoreId) {
-        return { error: "No store found" };
+        return { error: MESSAGES.ERRORS.NO_STORE_FOUND };
     }
 
     try {
         const store = await Store.findById(user.primaryStoreId);
-        if (!store) return { error: "Store record missing" };
+        if (!store) return { error: MESSAGES.ERRORS.STORE_RECORD_MISSING };
 
         // Attempt live sync with Google if forced or not done recently (e.g., 10 mins)
         const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -676,7 +719,7 @@ export const getStoreStatusAction = withAuth(async (user, force: boolean = false
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.GET_STORE_STATUS_FAIL, error);
-        return { error: "Failed to fetch store status" };
+        return { error: MESSAGES.ERRORS.FETCH_STORE_STATUS_FAILED };
     }
 });
 
@@ -704,7 +747,7 @@ export const purgeUserDataAction = withAuth(async (user) => {
             await rm(userUploadDir, { recursive: true, force: true });
             logInfo("PURGE", `Deleted local directory: ${userUploadDir}`);
         } catch (fsError) {
-            console.warn("   [FS] Failed to delete local directory (might not exist):", fsError);
+            console.warn(LOG_MESSAGES.FILE.PURGE_LOCAL_FAIL, fsError);
         }
 
         // 3. Purge Google Cloud Data
@@ -715,7 +758,7 @@ export const purgeUserDataAction = withAuth(async (user) => {
         return { success: true };
 
     } catch (error) {
-        console.error("Purge Action Failed:", error);
-        return { error: "Failed to complete purge operation." };
+        console.error(LOG_MESSAGES.FILE.PURGE_FAIL, error);
+        return { error: MESSAGES.ERRORS.PURGE_FAILED };
     }
 });

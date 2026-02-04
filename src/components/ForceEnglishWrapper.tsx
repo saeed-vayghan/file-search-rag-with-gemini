@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { I18nContext } from "@/lib/i18n/provider";
 import { en } from "@/lib/i18n/en";
+import { LOG_MESSAGES } from "@/config/constants";
 
 /**
  * A wrapper component that forces the content to be in English and LTR.
@@ -15,7 +16,7 @@ export function ForceEnglishWrapper({ children }: { children: ReactNode }) {
                 locale: "en",
                 t: en,
                 dir: "ltr",
-                setLocale: () => console.warn("Locale change ignored in ForceEnglishWrapper")
+                setLocale: () => console.warn(LOG_MESSAGES.UI.LOCALE_WARN)
             }}
         >
             <div dir="ltr" className="font-sans text-left">
