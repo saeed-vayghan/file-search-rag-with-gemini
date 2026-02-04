@@ -4,12 +4,14 @@ import { useState, useRef, useEffect, use } from "react";
 import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getLibraryFilesAction } from "@/actions/file-actions";
-import { ArrowLeft, Send, Paperclip, Trash2, FolderOpen, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Trash2, FolderOpen, Loader2, Shield, Sparkles } from "lucide-react";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { DateSeparator } from "@/components/chat/DateSeparator";
+import { MessageRenderer } from "@/components/chat/MessageRenderer";
+import { CopyButton } from "@/components/chat/CopyButton";
 
 export default function LibraryChatPage({ params }: { params: Promise<{ id: string }> }) {
     const { t, dir } = useI18n();
@@ -20,6 +22,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
     const [hasMore, setHasMore] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [libraryInfo, setLibraryInfo] = useState<{ name: string } | null>(null);
+    const [chatMode, setChatMode] = useState<"limited" | "auxiliary">("limited");
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -93,7 +96,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
         setIsLoading(true);
 
         try {
-            const result = await sendMessageAction(libraryId, "library", messages, input);
+            const result = await sendMessageAction(libraryId, "library", messages, input, chatMode);
             if (result.error) {
                 setMessages((prev) => [
                     ...prev,
@@ -119,19 +122,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
         }
     };
 
-    function renderMessageWithCitations(content: string) {
-        const parts = content.split(/(\[.*?\])/g);
-        return parts.map((part, i) => {
-            if (part.startsWith("[") && part.endsWith("]")) {
-                return (
-                    <span key={i} className="inline-flex items-center justify-center rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-400 mx-1 cursor-pointer hover:bg-blue-500/20 transition-colors">
-                        {part}
-                    </span>
-                );
-            }
-            return part;
-        });
-    }
+
 
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-slate-950">
@@ -195,12 +186,15 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
                                             {msg.role === "user" ? "S" : "AI"}
                                         </div>
                                         <div className={cn(
-                                            "rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap max-w-[80%]",
+                                            "rounded-lg p-4 pr-10 text-sm leading-relaxed whitespace-pre-wrap max-w-[80%] relative",
                                             msg.role === "user"
                                                 ? "bg-blue-600 text-white"
                                                 : "bg-slate-900 border border-slate-800 text-slate-200"
                                         )}>
-                                            {renderMessageWithCitations(msg.content)}
+                                            <div className="absolute top-2 right-2">
+                                                <CopyButton content={msg.content} />
+                                            </div>
+                                            <MessageRenderer content={msg.content} role={msg.role} />
                                             {/* Citations Block */}
                                             {msg.citations && msg.citations.length > 0 && (
                                                 <div className="mt-3 pt-3 border-t border-slate-700/50">
@@ -244,6 +238,39 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
 
                     {/* Input Area */}
                     <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-slate-950">
+                        {/* Mode Selector */}
+                        <div className="max-w-3xl mx-auto mb-2 flex justify-end">
+                            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setChatMode("limited")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                        chatMode === "limited"
+                                            ? "bg-slate-800 text-blue-400 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                    title={t.chat?.modeLimited || "Limited: Answers only from context"}
+                                >
+                                    <Shield className="h-3.5 w-3.5" />
+                                    <span>Limited</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setChatMode("auxiliary")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                        chatMode === "auxiliary"
+                                            ? "bg-slate-800 text-purple-400 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                    title={t.chat?.modeAuxiliary || "Auxiliary: Expands with general knowledge"}
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    <span>Auxiliary</span>
+                                </button>
+                            </div>
+                        </div>
                         <div className="max-w-3xl mx-auto relative flex items-end border border-input rounded-md bg-transparent focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all">
                             <div className="flex h-[52px] items-center px-2">
                                 <Button type="button" variant="ghost" size="icon" className="text-slate-400 hover:text-white">

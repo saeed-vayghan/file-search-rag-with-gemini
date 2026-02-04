@@ -11,6 +11,8 @@ import { DateSeparator } from "@/components/chat/DateSeparator";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
+import { MessageRenderer } from "@/components/chat/MessageRenderer";
+import { CopyButton } from "@/components/chat/CopyButton";
 
 type FileInfo = {
     id: string;
@@ -20,6 +22,7 @@ type FileInfo = {
     status: string;
     date: string;
     mimeType: string;
+    libraryId?: string;
 } | null;
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
@@ -152,7 +155,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         <div className="flex flex-col h-screen overflow-hidden bg-slate-950">
             {/* Header */}
             <header className="flex h-14 items-center gap-4 border-b border-border bg-slate-950 px-6 shrink-0">
-                <Link href="/" className="text-slate-400 hover:text-white transition-colors">
+                <Link
+                    href={fileInfo?.libraryId ? `/libraries/${fileInfo.libraryId}` : "/libraries"}
+                    className="text-slate-400 hover:text-white transition-colors"
+                >
                     <ArrowLeft className={cn("h-4 w-4", dir === "rtl" && "rotate-180")} />
                 </Link>
                 <div className="h-6 w-px bg-border mx-2" />
@@ -352,12 +358,15 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                                             {msg.role === "user" ? "S" : "AI"}
                                         </div>
                                         <div className={cn(
-                                            "rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap max-w-[80%]",
+                                            "rounded-lg p-4 pr-10 text-sm leading-relaxed whitespace-pre-wrap max-w-[80%] relative",
                                             msg.role === "user"
                                                 ? "bg-blue-600 text-white"
                                                 : "bg-slate-900 border border-slate-800 text-slate-200"
                                         )}>
-                                            {renderMessageWithCitations(msg.content)}
+                                            <div className="absolute top-2 right-2">
+                                                <CopyButton content={msg.content} />
+                                            </div>
+                                            <MessageRenderer content={msg.content} role={msg.role} />
 
                                             {/* Citations Block */}
                                             {msg.citations && msg.citations.length > 0 && (
@@ -485,16 +494,4 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     );
 }
 
-function renderMessageWithCitations(content: string) {
-    const parts = content.split(/(\[.*?\])/g);
-    return parts.map((part, i) => {
-        if (part.startsWith("[") && part.endsWith("]")) {
-            return (
-                <span key={i} className="inline-flex items-center justify-center rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-400 mx-1 cursor-pointer hover:bg-blue-500/20 transition-colors">
-                    {part}
-                </span>
-            );
-        }
-        return part;
-    });
-}
+

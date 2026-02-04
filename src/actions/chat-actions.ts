@@ -67,6 +67,15 @@ export async function sendMessageAction(
             systemInstruction = user.settings?.chatModes?.auxiliary?.instruction || DEFAULT_AUXILIARY;
         }
 
+        // Log chat request details
+        console.log("\n=== CHAT REQUEST ===");
+        console.log(`Scope: ${scope}`);
+        console.log(`Context ID: ${contextId}`);
+        console.log(`Chat Mode: ${requestedMode.toUpperCase()}`);
+        console.log(`User Message: "${newMessage}"`);
+        console.log(`System Instruction: ${systemInstruction}`);
+        console.log("==================\n");
+
         // 3. Save User Message
         const messageData: any = {
             role: "user",
@@ -89,6 +98,13 @@ export async function sendMessageAction(
             systemInstruction
         );
         const replyText = result.text || "I couldn't find relevant information in your documents.";
+
+        // Log chat response details
+        console.log("\n=== CHAT RESPONSE ===");
+        console.log(`Mode Used: ${requestedMode.toUpperCase()}`);
+        console.log(`Reply Length: ${replyText.length} chars`);
+        console.log(`Citations Count: ${result.citations?.length || 0}`);
+        console.log(`Reply Preview: "${replyText.substring(0, 100)}${replyText.length > 100 ? '...' : ''}"`); console.log("===================\n");
 
         // 4.5 Resolve Citations (Map Google File ID -> Display Name)
         let enrichedCitations = result.citations || [];

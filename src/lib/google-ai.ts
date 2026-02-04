@@ -111,7 +111,6 @@ export class GoogleAIService {
      */
     static async search(storeName: string, query: string, scope?: { type: 'global' | 'library' | 'file', id?: string }, systemInstruction?: string) {
         const startTime = Date.now();
-        console.log(`[GoogleAI] Searching ${storeName}: "${query}" (Scope: ${JSON.stringify(scope)})`);
 
         // Construct Metadata Filter
         let metadataFilter: string | undefined;

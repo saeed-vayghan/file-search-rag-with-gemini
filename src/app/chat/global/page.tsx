@@ -4,13 +4,15 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, deleteChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getLibrariesAction } from "@/actions/file-actions";
-import { ArrowLeft, Send, Paperclip, Trash2, Globe, Loader2, ChevronDown, FolderOpen, Check } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Trash2, Globe, Loader2, ChevronDown, FolderOpen, Check, Shield, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { DateSeparator } from "@/components/chat/DateSeparator";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
+import { MessageRenderer } from "@/components/chat/MessageRenderer";
+import { CopyButton } from "@/components/chat/CopyButton";
 
 export default function GlobalChatPage() {
     const { t, dir } = useI18n();
@@ -20,6 +22,7 @@ export default function GlobalChatPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [chatMode, setChatMode] = useState<"limited" | "auxiliary">("limited");
 
     // Scope Selector State
     const [isScopeOpen, setIsScopeOpen] = useState(false);
@@ -104,7 +107,7 @@ export default function GlobalChatPage() {
         setIsLoading(true);
 
         try {
-            const result = await sendMessageAction("global", "global", messages, input);
+            const result = await sendMessageAction("global", "global", messages, input, chatMode);
             if (result.error) {
                 setMessages((prev) => [
                     ...prev,
@@ -264,12 +267,15 @@ export default function GlobalChatPage() {
                                             {msg.role === "user" ? "S" : "AI"}
                                         </div>
                                         <div className={cn(
-                                            "rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap max-w-[80%]",
+                                            "rounded-lg p-4 pr-10 text-sm leading-relaxed max-w-[80%] relative",
                                             msg.role === "user"
                                                 ? "bg-blue-600 text-white"
                                                 : "bg-slate-900 border border-slate-800 text-slate-200"
                                         )}>
-                                            {renderMessageWithCitations(msg.content)}
+                                            <div className="absolute top-2 right-2">
+                                                <CopyButton content={msg.content} />
+                                            </div>
+                                            <MessageRenderer content={msg.content} role={msg.role} />
                                             {/* Citations Block */}
                                             {msg.citations && msg.citations.length > 0 && (
                                                 <div className="mt-3 pt-3 border-t border-slate-700/50">
@@ -313,6 +319,39 @@ export default function GlobalChatPage() {
 
                     {/* Input Area */}
                     <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-slate-950">
+                        {/* Mode Selector */}
+                        <div className="max-w-3xl mx-auto mb-2 flex justify-end">
+                            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+                                <button
+                                    type="button"
+                                    onClick={() => setChatMode("limited")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                        chatMode === "limited"
+                                            ? "bg-slate-800 text-blue-400 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                    title={t.chat?.modeLimited || "Limited: Answers only from context"}
+                                >
+                                    <Shield className="h-3.5 w-3.5" />
+                                    <span>Limited</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setChatMode("auxiliary")}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                        chatMode === "auxiliary"
+                                            ? "bg-slate-800 text-purple-400 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-300"
+                                    )}
+                                    title={t.chat?.modeAuxiliary || "Auxiliary: Expands with general knowledge"}
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    <span>Auxiliary</span>
+                                </button>
+                            </div>
+                        </div>
                         <div className="max-w-3xl mx-auto relative flex items-end border border-input rounded-md bg-transparent focus-within:ring-1 focus-within:ring-purple-500/50 transition-all">
                             <div className="flex h-[52px] items-center px-2">
                                 <Button type="button" variant="ghost" size="icon" className="text-slate-400 hover:text-white">
