@@ -13,7 +13,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
 import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
-import { validateFileSize, validateStoreCapacity } from "@/lib/file-logic";
+import { validateFileSize, validateStoreCapacity, mapFileToUi, generateLocalFilePath } from "@/lib/file-logic";
 import Message from "@/models/Message";
 
 
@@ -220,22 +220,24 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         }
 
         // 8. Local Preview Storage
-        const ext = file.name.split(".").pop() || "bin";
-        const googleFileIdClean = uploadRes.name.replace("files/", "");
-        const localFileName = `${newFile._id}_${googleFileIdClean}.${ext}`;
-        const userUploadDir = join(process.cwd(), "uploads", user._id.toString());
+        const { relativePath, absolutePath } = generateLocalFilePath(
+            process.cwd(),
+            user._id.toString(),
+            newFile._id.toString(),
+            uploadRes.name,
+            file.name
+        );
 
         const { mkdir } = await import("fs/promises");
-        await mkdir(userUploadDir, { recursive: true });
-        const localFilePath = join(userUploadDir, localFileName);
-        await writeFile(localFilePath, buffer);
+        await mkdir(join(process.cwd(), "uploads", user._id.toString()), { recursive: true });
+        await writeFile(absolutePath, buffer);
 
         // 9. Finalize File Record
         newFile.status = "INGESTING";
         newFile.googleFileId = uploadRes.name;
         newFile.googleUri = uploadRes.uri;
         newFile.googleOperationName = operationName;
-        newFile.localPath = `uploads/${user._id.toString()}/${localFileName}`;
+        newFile.localPath = relativePath;
         await newFile.save();
 
         // 10. Update Statistics
@@ -273,19 +275,7 @@ export const getFilesAction = withAuth(async (user) => {
         .populate("libraryId", "name icon")
         .lean();
 
-    return files.map((f: any) => ({
-        id: f._id.toString(),
-        displayName: f.displayName,
-        mimeType: f.mimeType,
-        type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
-        sizeBytes: f.sizeBytes,
-        size: (f.sizeBytes / 1024).toFixed(1) + " KB",
-        status: f.status,
-        date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
-        libraryName: f.libraryId?.name || "Uncategorized",
-        libraryIcon: f.libraryId?.icon || UI_DEFAULTS.LIBRARY.ICON,
-        libraryId: f.libraryId?._id?.toString(),
-    }));
+    return files.map(mapFileToUi);
 });
 
 export const getFileAction = withAuth(async (user, fileId: string) => {
@@ -296,15 +286,8 @@ export const getFileAction = withAuth(async (user, fileId: string) => {
         const f = file as any; // Cast for lean properties
 
         return {
-            id: f._id.toString(),
-            displayName: f.displayName,
-            mimeType: f.mimeType,
-            type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
-            sizeBytes: f.sizeBytes,
-            size: (f.sizeBytes / 1024).toFixed(1) + " KB",
-            status: f.status,
-            date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
-            googleUri: f.googleUri,
+            ...mapFileToUi(file),
+            googleUri: (file as any).googleUri, // Additional property for single file view if needed
         };
     } catch {
         return null;
@@ -494,13 +477,7 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
     }
 });
 
-function formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 KB";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
+import { formatBytes } from "@/lib/utils";
 
 
 
@@ -660,16 +637,7 @@ export const getLibraryFilesAction = withAuth(async (user, libraryId: string) =>
                 color: library.color || UI_DEFAULTS.LIBRARY.COLOR,
                 description: library.description || "",
             },
-            files: files.map((f: any) => ({
-                id: f._id.toString(),
-                displayName: f.displayName,
-                mimeType: f.mimeType,
-                type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
-                sizeBytes: f.sizeBytes,
-                size: (f.sizeBytes / 1024).toFixed(1) + " KB",
-                status: f.status,
-                date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
-            }))
+            files: files.map(mapFileToUi)
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.GET_LIB_FILES_FAIL, error);

@@ -3,13 +3,10 @@
 import User from "@/models/User";
 import { revalidatePath } from "next/cache";
 import { withAuth, withOptionalAuth } from "@/lib/auth-middleware";
-import { CHAT_CONSTANTS, MESSAGES, PATHS, LOG_MESSAGES, CHAT_MODES, ChatModeType } from "@/config/constants";
+import { MESSAGES, PATHS, LOG_MESSAGES } from "@/config/constants";
+import { normalizeChatModeSettings, ChatModeSettings } from "@/lib/user-logic";
 
-export type ChatModeSettings = {
-    limited: { instruction: string; enabled: boolean };
-    auxiliary: { instruction: string; enabled: boolean };
-    defaultMode: ChatModeType;
-};
+export type { ChatModeSettings } from "@/lib/user-logic";
 
 export const getChatModeSettings = withOptionalAuth(async (user): Promise<ChatModeSettings | null> => {
     try {
@@ -18,18 +15,7 @@ export const getChatModeSettings = withOptionalAuth(async (user): Promise<ChatMo
         const userDoc = await User.findById(user._id).select("settings");
         if (!userDoc || !userDoc.settings?.chatModes) return null;
 
-        // Ensure default structure if partial
-        return {
-            limited: {
-                instruction: userDoc.settings.chatModes.limited?.instruction || CHAT_CONSTANTS.MODES.LIMITED.DEFAULT_INSTRUCTION,
-                enabled: userDoc.settings.chatModes.limited?.enabled ?? true
-            },
-            auxiliary: {
-                instruction: userDoc.settings.chatModes.auxiliary?.instruction || CHAT_CONSTANTS.MODES.AUXILIARY.DEFAULT_INSTRUCTION,
-                enabled: userDoc.settings.chatModes.auxiliary?.enabled ?? true
-            },
-            defaultMode: (userDoc.settings.chatModes as any).defaultMode || CHAT_MODES.LIMITED
-        };
+        return normalizeChatModeSettings(userDoc.settings.chatModes);
     } catch (error) {
         console.error(LOG_MESSAGES.USER.FETCH_SETTINGS_FAIL, error);
         return null;

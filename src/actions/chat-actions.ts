@@ -7,8 +7,9 @@ import * as GoogleAIService from "@/lib/google-ai";
 import { logChatRequest, logChatResponse, logDebug } from "@/lib/logger";
 import { withAuth } from "@/lib/auth-middleware";
 import Message from "@/models/Message";
-import { CHAT_CONSTANTS, MESSAGES, LOG_MESSAGES, CHAT_SCOPES, CHAT_ROLES, CHAT_MODES, ChatScopeType, ChatRoleType, ChatModeType } from "@/config/constants";
+import { MESSAGES, LOG_MESSAGES, CHAT_SCOPES, CHAT_ROLES, CHAT_MODES, ChatScopeType, ChatRoleType, ChatModeType } from "@/config/constants";
 import { revalidatePath } from "next/cache";
+import { resolveSystemInstruction, extractGoogleFileIdsFromCitations, enrichCitationsWithFileNames, mapMessageToUi } from "@/lib/chat-logic";
 
 export type ChatMessage = {
     id?: string;
@@ -49,17 +50,7 @@ export const sendMessageAction = withAuth(async (
         // 2. Determine Chat Mode & Instruction
         const defaultMode = (user.settings?.defaultMode || CHAT_MODES.LIMITED) as ChatModeType;
         const requestedMode = mode || defaultMode;
-
-        // Define default instructions as fallback
-        const DEFAULT_LIMITED = CHAT_CONSTANTS.MODES.LIMITED.DEFAULT_INSTRUCTION;
-        const DEFAULT_AUXILIARY = CHAT_CONSTANTS.MODES.AUXILIARY.DEFAULT_INSTRUCTION;
-
-        let systemInstruction: string;
-        if (requestedMode === CHAT_MODES.LIMITED) {
-            systemInstruction = user.settings?.chatModes?.limited?.instruction || DEFAULT_LIMITED;
-        } else {
-            systemInstruction = user.settings?.chatModes?.auxiliary?.instruction || DEFAULT_AUXILIARY;
-        }
+        const systemInstruction = resolveSystemInstruction(user.settings, requestedMode);
 
         // Log chat request details
         logChatRequest({
@@ -105,53 +96,26 @@ export const sendMessageAction = withAuth(async (
         let enrichedCitations = result.citations || [];
         try {
             if (enrichedCitations.length > 0) {
-                // citation.title is currently the Google ID (e.g. "files/abc...") or a generic title
-                // We want to replace it with the actual file displayName from our DB.
-
-                // 1. Extract potential File IDs from citations
-                // The API usually returns the file ID as the title OR part of the URI
-                const googleFileIds = enrichedCitations
-                    .map((c: any) => c.title)
-                    .filter((t: string) => t && (t.startsWith("files/") || t.length > 20)); // Basic heuristic
-
+                const googleFileIds = extractGoogleFileIdsFromCitations(enrichedCitations);
                 logDebug("Chat", "Extracted IDs:", googleFileIds);
 
                 if (googleFileIds.length > 0) {
-                    // 2. Find matching files in DB
-                    // We need to match on googleFileId OR clean ID
                     const files = await FileModel.find({
                         $or: [
                             { googleFileId: { $in: googleFileIds } },
-                            // Also try matching without "files/" prefix just in case
                             { googleFileId: { $in: googleFileIds.map((id: string) => `files/${id}`) } }
                         ]
                     }).select("googleFileId displayName localPath").lean();
 
                     logDebug("Chat", "Found Files:", files.map(f => `${f.googleFileId} -> ${f.displayName}`));
 
-                    // 3. Create a Map
                     const fileMap = new Map();
                     files.forEach(f => {
                         if (f.googleFileId) fileMap.set(f.googleFileId, f);
                         if (f.googleFileId) fileMap.set(f.googleFileId.replace("files/", ""), f);
                     });
 
-                    // 4. Update Citations
-                    enrichedCitations = enrichedCitations.map((c: any) => {
-                        let title = c.title;
-
-                        // Try matching title directly or with files/ prefix
-                        const file = fileMap.get(title) || fileMap.get(`files/${title}`);
-
-                        if (file) {
-                            title = file.displayName;
-                        }
-
-                        return {
-                            ...c,
-                            title
-                        };
-                    });
+                    enrichedCitations = enrichCitationsWithFileNames(enrichedCitations, fileMap);
                     logDebug("Chat", "Enriched Citations:", JSON.stringify(enrichedCitations, null, 2));
                 }
             }
@@ -221,17 +185,7 @@ export const getChatHistoryAction = withAuth(async (
 
         // Reverse to return oldest first (chronological order for chat UI)
         return {
-            messages: resultMessages.reverse().map((m: any) => ({
-                id: m._id.toString(),
-                role: m.role as ChatRoleType,
-                content: m.content,
-                citations: m.citations?.map((c: any) => ({
-                    id: c.id,
-                    uri: c.uri,
-                    title: c.title
-                })),
-                createdAt: m.createdAt.toISOString(),
-            })),
+            messages: resultMessages.reverse().map(mapMessageToUi),
             hasMore,
         };
     } catch (error) {

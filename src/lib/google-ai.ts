@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { stat } from "fs/promises";
 import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo, logWarn } from "@/lib/logger";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
+import { translateGoogleError } from "@/lib/chat-logic";
 
 if (!process.env.GOOGLE_API_KEY) {
     throw new Error(MESSAGES.ERRORS.GOOGLE_API_KEY_MISSING);
@@ -34,12 +35,9 @@ export async function uploadFile(
     logFileOperation({ operation: "upload", fileName: displayName, additionalInfo: `Type: ${mimeType}, Path: ${filePath}` });
 
     try {
-        // Verify file exists locally before sending
-        const { stat } = await import("fs/promises");
         const stats = await stat(filePath);
         logInfo("GoogleAI", `Local file verified. Size: ${stats.size} bytes`);
 
-        // Note: The SDK's files.upload expects a path string in Node.js environment
         const uploadResponse = await aiClient.files.upload({
             file: filePath,
             config: {
@@ -181,16 +179,8 @@ export async function search(
             citations
         };
     } catch (error: any) {
-        const duration = Date.now() - startTime;
         console.error(LOG_MESSAGES.GOOGLE.SEARCH_FAIL, error);
-
-        // Enhance error for specific cases
-        if (error.cause?.code === 'ETIMEDOUT' || error.cause?.code === 'ESOCKETTIMEDOUT' || error.message.includes("fetch failed")) {
-            console.error(LOG_MESSAGES.GOOGLE.TIMEOUT_ERROR);
-            throw new Error(MESSAGES.ERRORS.SEARCH_TIMEOUT);
-        }
-
-        throw error;
+        throw new Error(translateGoogleError(error));
     }
 }
 
@@ -348,7 +338,3 @@ export async function purgeAllUserGoogleData(
     logDangerousOperation("GoogleAI", "Global Purge Complete.");
     return true;
 }
-
-// For backward compatibility (if minimal changes preferred), but we are refactoring.
-// Exporting the functions directly is cleaner.
-
