@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useTransition } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +12,33 @@ import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface SettingsViewProps {
-    userStats: { name: string };
+    userStats: {
+        name: string;
+        email?: string;
+        image?: string;
+        expires?: string;
+        [key: string]: any;
+    };
 }
 
 export function SettingsView({ userStats }: SettingsViewProps) {
     const { t, dir } = useI18n();
+
+    const [name, setName] = useState(userStats.name);
+    const [isPending, startTransition] = useTransition();
+
+    const handleSave = () => {
+        startTransition(async () => {
+            const { updateUserAction } = await import("@/actions/user-actions");
+            const result = await updateUserAction({ name });
+            if ("error" in result) {
+                // You might want to add a toast notification here
+                alert("Failed to update profile: " + result.error);
+            } else if (!result.success) {
+                alert("Failed to update profile");
+            }
+        });
+    };
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -54,18 +78,67 @@ export function SettingsView({ userStats }: SettingsViewProps) {
                     <CardContent className="space-y-4">
                         <div>
                             <label className="text-sm text-muted-foreground">{t.settings.name}</label>
-                            <Input defaultValue={userStats.name} className="mt-1 bg-slate-800" />
+                            <Input
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="mt-1 bg-slate-800"
+                            />
                         </div>
+                        <div className="flex items-center gap-4 mb-4">
+                            {/* Avatar Display */}
+                            {/* @ts-ignore */}
+                            {userStats.image ? (
+                                <img src={userStats.image} alt={userStats.name} className="h-16 w-16 rounded-full border border-slate-700" />
+                            ) : (
+                                <div className="h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
+                                    <User className="h-8 w-8 text-slate-500" />
+                                </div>
+                            )}
+                            <div className="text-sm text-slate-400">
+                                Google Account
+                            </div>
+                        </div>
+
                         <div>
                             <label className="text-sm text-muted-foreground">{t.settings.email}</label>
-                            <Input defaultValue="saeed@example.com" className="mt-1 bg-slate-800" disabled />
+                            { /* @ts-ignore */}
+                            <Input defaultValue={userStats.email || "Unknown"} className="mt-1 bg-slate-800" disabled />
                         </div>
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700">{t.settings.saveChanges}</Button>
+                        {userStats.expires && (
+                            <div>
+                                <label className="text-sm text-muted-foreground">Session Expires</label>
+                                <Input
+                                    defaultValue={new Date(userStats.expires).toLocaleString()}
+                                    className="mt-1 bg-slate-800"
+                                    disabled
+                                />
+                            </div>
+                        )}
+                        <div className="flex gap-2">
+                            <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={handleSave}
+                                disabled={isPending}
+                            >
+                                {isPending ? "Saving..." : t.settings.saveChanges}
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={async () => {
+                                    const { signOut } = await import("next-auth/react");
+                                    signOut({ callbackUrl: "/auth/signin" });
+                                }}
+                            >
+                                Sign Out
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
 
                 {/* Chat Rules */}
-                <Link href="/settings/chat-rules">
+                <Link href="/settings/chat-rules" className="block">
                     <Card className="hover:bg-slate-900/50 transition-colors cursor-pointer border-blue-500/20">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">

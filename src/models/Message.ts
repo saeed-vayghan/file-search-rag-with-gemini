@@ -3,10 +3,12 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IMessage extends Document {
     fileId?: mongoose.Types.ObjectId;
     libraryId?: mongoose.Types.ObjectId;
+    userId?: mongoose.Types.ObjectId;
     scope: "file" | "library" | "global";
     role: "user" | "assistant";
     content: string;
     citations?: { id: number; uri?: string; title?: string }[];
+
     createdAt: Date;
 }
 
@@ -22,6 +24,12 @@ const MessageSchema = new Schema<IMessage>(
             type: Schema.Types.ObjectId,
             ref: "Library",
             required: false,
+            index: true,
+        },
+        userId: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: false, // Optional for backward compatibility/system messages
             index: true,
         },
         scope: {

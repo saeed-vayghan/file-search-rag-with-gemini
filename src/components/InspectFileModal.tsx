@@ -33,8 +33,8 @@ export function InspectFileModal({ fileId, fileName, isOpen, onClose }: InspectF
         setData(null);
         try {
             const result = await getRemoteFileDebugAction(fileId);
-            if (result.error) {
-                setError(result.error);
+            if ('error' in result) {
+                setError(result.error || "Unknown error");
             } else {
                 setData(result.metadata);
             }

@@ -23,7 +23,7 @@ export default function DangerZonePage() {
 
         try {
             const result = await purgeUserDataAction();
-            if (result.success) {
+            if ("success" in result && result.success) {
                 setSuccess(true);
                 // Redirect after a brief delay to show success message
                 setTimeout(() => {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, deleteChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getLibrariesAction } from "@/actions/file-actions";
 import { ArrowLeft, Send, Paperclip, Trash2, Globe, Loader2, ChevronDown, FolderOpen, Check, Shield, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
 import Link from "next/link";
@@ -44,13 +45,18 @@ export default function GlobalChatPage() {
         async function init() {
             setMessages([]);
             // Load History
-            const { messages: history, hasMore: more } = await getChatHistoryAction("global", "global");
-            setMessages(history);
-            setHasMore(more);
+            // Load History
+            const histRes = await getChatHistoryAction("global", "global");
+            if (!('error' in histRes) && 'messages' in histRes) {
+                setMessages(histRes.messages);
+                setHasMore(histRes.hasMore);
+            }
 
             // Load Libraries for Selector
             const libs = await getLibrariesAction();
-            setLibraries(libs);
+            if (!("error" in libs)) {
+                setLibraries(libs);
+            }
         }
         init();
     }, []);
@@ -62,13 +68,15 @@ export default function GlobalChatPage() {
         // @ts-ignore
         const before = oldestMessage.createdAt;
 
-        const { messages: olderMessages, hasMore: more } = await getChatHistoryAction("global", "global", before);
+        const histRes = await getChatHistoryAction("global", "global", before);
 
-        if (olderMessages.length > 0) {
-            setMessages(prev => [...olderMessages, ...prev]);
-            setHasMore(more);
-        } else {
-            setHasMore(false);
+        if (!('error' in histRes)) {
+            if (histRes.messages.length > 0) {
+                setMessages(prev => [...histRes.messages, ...prev]);
+                setHasMore(histRes.hasMore);
+            } else {
+                setHasMore(false);
+            }
         }
     };
 
@@ -107,12 +115,18 @@ export default function GlobalChatPage() {
 
         try {
             const result = await sendMessageAction("global", "global", messages, input, chatMode);
-            if (result.error) {
+
+            if (!("reply" in result) || !result.reply) {
+                // Auth failure or complete error
                 setMessages((prev) => [
                     ...prev,
-                    { role: "assistant", content: `${t.common.error}: ${result.error}` },
+                    { role: "assistant", content: `${t.common.error}: ${result.error || "Unknown error"}` },
                 ]);
             } else {
+                // Success
+                if (result.error) {
+                    toast.error(result.error);
+                }
                 setMessages((prev) => [
                     ...prev,
                     {

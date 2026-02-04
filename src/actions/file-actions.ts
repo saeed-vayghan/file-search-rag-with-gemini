@@ -8,20 +8,18 @@ import Library from "@/models/Library";
 import Store from "@/models/Store";
 import { GoogleAIService } from "@/lib/google-ai";
 import { logInfo, logDangerousOperation, logDebug } from "@/lib/logger";
+import { withAuth, withOptionalAuth } from "@/lib/auth-middleware";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
 
 
-// Mock User Email for now (Auth integration later)
-const USER_EMAIL = "saeed@example.com";
-
-export async function checkFileDuplicate(hash: string, libraryId?: string) {
+export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
     try {
         await connectToDatabase();
 
-        const query: any = { contentHash: hash };
+        const query: any = { contentHash: hash, userId: user._id };
         if (libraryId) {
             query.libraryId = libraryId;
         }
@@ -43,9 +41,10 @@ export async function checkFileDuplicate(hash: string, libraryId?: string) {
         console.error("Error checking duplicate:", error);
         return { exists: false };
     }
-}
+});
 
-export async function uploadFileAction(formData: FormData) {
+
+export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     await connectToDatabase();
 
     const file = formData.get("file") as File | null;
@@ -55,20 +54,17 @@ export async function uploadFileAction(formData: FormData) {
     // Rule: Uncategorized files are not allowed.
     if (!libraryId || libraryId === "null" || libraryId === "undefined") {
         // Find or Create Default Library
-        const user = await User.findOne({ email: USER_EMAIL });
-        if (user) {
-            let defaultLib = await Library.findOne({ userId: user._id, name: "Default" });
-            if (!defaultLib) {
-                defaultLib = await Library.create({
-                    userId: user._id,
-                    name: "Default",
-                    icon: "📁",
-                    color: "text-slate-500",
-                    description: "Auto-created default library"
-                });
-            }
-            libraryId = defaultLib._id.toString();
+        let defaultLib = await Library.findOne({ userId: user._id, name: "Default" });
+        if (!defaultLib) {
+            defaultLib = await Library.create({
+                userId: user._id,
+                name: "Default",
+                icon: "📁",
+                color: "text-slate-500",
+                description: "Auto-created default library"
+            });
         }
+        libraryId = defaultLib._id.toString();
     }
 
     if (!file) {
@@ -78,17 +74,12 @@ export async function uploadFileAction(formData: FormData) {
     let newFileId: string | null = null;
 
     try {
-        // 1. Get or Create User
-        let user = await User.findOne({ email: USER_EMAIL });
-        if (!user) {
-            user = await User.create({
-                email: USER_EMAIL,
-                name: "Saeed",
-                tier: DEFAULT_TIER,
-            });
+        const userDoc = await User.findById(user._id);
+        if (!userDoc) {
+            return { error: "User not found" };
         }
 
-        const userTier = (user.tier || DEFAULT_TIER) as TierKey;
+        const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
         const limits = TIERS[userTier];
 
         // 1.1 Enforce 100MB per file limit
@@ -231,14 +222,11 @@ export async function uploadFileAction(formData: FormData) {
 
         return { error: "Upload failed" };
     }
-}
+});
 
-export async function getFilesAction() {
+
+export const getFilesAction = withAuth(async (user) => {
     await connectToDatabase();
-    // Simplified fetch for now
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user) return [];
-
     const files = await FileModel.find({ userId: user._id })
         .sort({ createdAt: -1 })
         .populate("libraryId", "name icon")
@@ -263,12 +251,12 @@ export async function getFilesAction() {
         // @ts-ignore
         libraryId: f.libraryId?._id?.toString(),
     }));
-}
+});
 
-export async function getFileAction(fileId: string) {
+export const getFileAction = withAuth(async (user, fileId: string) => {
     await connectToDatabase();
     try {
-        const file = await FileModel.findById(fileId).lean();
+        const file = await FileModel.findOne({ _id: fileId, userId: user._id }).lean();
         if (!file) return null;
 
         return {
@@ -287,21 +275,21 @@ export async function getFileAction(fileId: string) {
     } catch {
         return null;
     }
-}
+});
 
-export async function getUserStatsAction() {
+export const getUserStatsAction = withAuth(async (user) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user) {
+    const userDoc = await User.findById(user._id);
+    if (!userDoc) {
         return {
-            name: "Guest",
+            name: user.name || "User",
             totalDocs: 0,
             storageUsed: "0 KB",
             storageLimit: "1 GB",
         };
     }
 
-    const userTier = (user.tier || DEFAULT_TIER) as TierKey;
+    const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
     const limits = TIERS[userTier];
 
     const files = await FileModel.find({ userId: user._id });
@@ -309,6 +297,8 @@ export async function getUserStatsAction() {
 
     return {
         name: user.name,
+        email: user.email,
+        image: user.image,
         tier: userTier,
         totalDocs: files.length,
         storageUsed: formatBytes(totalBytes),
@@ -316,13 +306,11 @@ export async function getUserStatsAction() {
         storageLimit: formatBytes(limits.maxStoreSizeBytes),
         storageLimitBytes: limits.maxStoreSizeBytes,
     };
-}
+});
 
-export async function getLibrariesAction() {
+
+export const getLibrariesAction = withAuth(async (user) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user) return [];
-
     // Get real libraries from DB
     const libraries = await Library.find({ userId: user._id }).lean();
 
@@ -345,14 +333,10 @@ export async function getLibrariesAction() {
     );
 
     return result;
-}
+});
 
-export async function createLibraryAction(name: string, icon?: string, color?: string) {
+export const createLibraryAction = withAuth(async (user, name: string, icon?: string, color?: string) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user) {
-        return { error: "User not found" };
-    }
 
     try {
         const library = await Library.create({
@@ -378,14 +362,11 @@ export async function createLibraryAction(name: string, icon?: string, color?: s
         console.error("Create Library Failed:", error);
         return { error: "Failed to create library" };
     }
-}
+});
 
-export async function updateLibraryAction(libraryId: string, name: string, icon?: string, color?: string) {
+
+export const updateLibraryAction = withAuth(async (user, libraryId: string, name: string, icon?: string, color?: string) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user) {
-        return { error: "User not found" };
-    }
 
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
@@ -416,19 +397,20 @@ export async function updateLibraryAction(libraryId: string, name: string, icon?
         console.error("Update Library Failed:", error);
         return { error: "Failed to update library" };
     }
-}
+});
 
-export async function deleteLibraryAction(libraryId: string) {
+
+export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
     await connectToDatabase();
 
     try {
-        const library = await Library.findById(libraryId);
+        const library = await Library.findOne({ _id: libraryId, userId: user._id });
         if (!library) {
             return { error: "Library not found" };
         }
 
         // Cascade Delete Files
-        const files = await FileModel.find({ libraryId: library._id });
+        const files = await FileModel.find({ libraryId: library._id, userId: user._id });
         logDebug("DeleteLibrary", `Found ${files.length} files in library ${library.name} (${libraryId})`);
 
         let deletedCount = 0;
@@ -438,7 +420,20 @@ export async function deleteLibraryAction(libraryId: string) {
         for (const file of files) {
             try {
                 logDebug("DeleteLibrary", `Deleting file: ${file._id}`);
-                const result = await deleteFileAction(file._id.toString());
+                // Since deleteFileAction is now authenticated, we can't call it directly as a function easily expecting the same user context unless we refactor.
+                // However, since we are already inside an authenticated action (deleteLibraryAction) and we have the user,
+                // we can just call the logic OR call the action if we pass the context.
+                // But `deleteFileAction` expects (user, fileId).
+                // Actually, `withAuth` returns a function that expects (fileId).
+                // But the `user` is injected by the middleware.
+                // We cannot call an Action from another Action and expect Auth to pass through via headers in a direct import call.
+                // We must extract the logic or invoke `deleteFileInternal` (refactor pattern).
+
+                // Refactor Strategy: We will call the logic directly or we need to separate Logic from Action.
+                // For now, I will inline the internal deletion logic or assume I can call a helper.
+                // Let's create a helper `deleteFileInternal` to reuse logic.
+                const result = await deleteFileInternal(user, file._id.toString());
+
                 if (result.success) {
                     deletedCount++;
                 } else {
@@ -468,7 +463,7 @@ export async function deleteLibraryAction(libraryId: string) {
         console.error("Delete Library Failed:", error);
         return { error: "Failed to delete library" };
     }
-}
+});
 
 function formatBytes(bytes: number): string {
     if (bytes === 0) return "0 KB";
@@ -500,11 +495,11 @@ function getColorForType(type: string): string {
     }
 }
 
-export async function checkFileStatusAction(fileId: string) {
+export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
     await connectToDatabase();
 
     try {
-        const file = await FileModel.findById(fileId);
+        const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file) {
             return { error: "File not found" };
         }
@@ -539,15 +534,16 @@ export async function checkFileStatusAction(fileId: string) {
         console.error("Check Status Failed:", error);
         return { error: "Failed to check status" };
     }
-}
+});
 
 import Message from "@/models/Message";
 
-export async function deleteFileAction(fileId: string) {
-    await connectToDatabase();
 
+// Internal helper for usage within other server actions (avoids Auth middleware recursion issues)
+// Assumes caller has already verified User
+async function deleteFileInternal(user: any, fileId: string) {
     try {
-        const file = await FileModel.findById(fileId);
+        const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file) {
             return { error: "File not found" };
         }
@@ -557,7 +553,7 @@ export async function deleteFileAction(fileId: string) {
         if (file.googleFileId) {
             try {
                 // A. Explicitly delete from Store (User Request)
-                const user = await User.findById(file.userId);
+                // We already have the user object passed in
                 if (user && user.primaryStoreId) {
                     const store = await Store.findById(user.primaryStoreId);
                     if (store && store.googleStoreId) {
@@ -594,10 +590,11 @@ export async function deleteFileAction(fileId: string) {
         await FileModel.findByIdAndDelete(fileId);
 
         // 5. Update Store Stats
-        const user = await User.findById(file.userId);
-        if (user && user.primaryStoreId) {
+        // Re-fetch user just to be sure we have latest or use passed user
+        const freshUser = await User.findById(user._id);
+        if (freshUser && freshUser.primaryStoreId) {
             try {
-                const store = await Store.findById(user.primaryStoreId);
+                const store = await Store.findById(freshUser.primaryStoreId);
                 if (store) {
                     store.fileCount = Math.max(0, store.fileCount - 1);
                     store.sizeBytes = Math.max(0, store.sizeBytes - (file.sizeBytes || 0));
@@ -620,10 +617,15 @@ export async function deleteFileAction(fileId: string) {
     }
 }
 
-export async function getRemoteFileDebugAction(fileId: string) {
+export const deleteFileAction = withAuth(async (user, fileId: string) => {
+    await connectToDatabase();
+    return deleteFileInternal(user, fileId);
+});
+
+export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) => {
     await connectToDatabase();
     try {
-        const file = await FileModel.findById(fileId);
+        const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file || !file.googleFileId) {
             return { error: "File not found or no Google ID" };
         }
@@ -637,11 +639,9 @@ export async function getRemoteFileDebugAction(fileId: string) {
     } catch (error) {
         return { error: "Failed to inspect remote file" };
     }
-}
-export async function getLibraryFilesAction(libraryId: string) {
+});
+export const getLibraryFilesAction = withAuth(async (user, libraryId: string) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user) return { files: [], library: null };
 
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id }).lean();
@@ -675,12 +675,11 @@ export async function getLibraryFilesAction(libraryId: string) {
         console.error("Get Library Files Failed:", error);
         return { files: [], library: null };
     }
-}
+});
 
-export async function getStoreStatusAction(force: boolean = false) {
+export const getStoreStatusAction = withAuth(async (user, force: boolean = false) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-    if (!user || !user.primaryStoreId) {
+    if (!user.primaryStoreId) {
         return { error: "No store found" };
     }
 
@@ -723,15 +722,10 @@ export async function getStoreStatusAction(force: boolean = false) {
         console.error("Get Store Status Failed:", error);
         return { error: "Failed to fetch store status" };
     }
-}
+});
 
-export async function purgeUserDataAction() {
+export const purgeUserDataAction = withAuth(async (user) => {
     await connectToDatabase();
-    const user = await User.findOne({ email: USER_EMAIL });
-
-    if (!user) {
-        return { error: "User not found" };
-    }
 
     try {
         logDangerousOperation("PURGE", `Starting Purge for User: ${user.email}`);
@@ -769,4 +763,4 @@ export async function purgeUserDataAction() {
         console.error("Purge Action Failed:", error);
         return { error: "Failed to complete purge operation." };
     }
-}
+});

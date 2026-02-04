@@ -6,11 +6,15 @@ export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
   // Fetch real data from the database
-  const [files, userStats, libraries] = await Promise.all([
+  const [filesResult, userStatsResult, librariesResult] = await Promise.all([
     getFilesAction(),
     getUserStatsAction(),
     getLibrariesAction(),
   ]);
+
+  const files = ("error" in filesResult) ? [] : filesResult;
+  const userStats = ("error" in userStatsResult) ? { name: "Guest", totalDocs: 0, storageUsed: "0 KB", storageLimit: "1 GB" } : userStatsResult;
+  const libraries = ("error" in librariesResult) ? [] : librariesResult;
 
   return <DashboardView files={files} userStats={userStats} libraries={libraries} />;
 }

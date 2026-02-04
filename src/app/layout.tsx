@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 import { ToastProvider } from "@/lib/toast";
+import { AuthProvider } from "@/components/AuthProvider";
 
 export default function RootLayout({
   children,
@@ -28,19 +29,21 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet" />
       </head>
       <body className={cn(inter.className, "min-h-screen bg-[#050505] text-foreground antialiased")}>
-        <I18nProvider>
-          <ToastProvider>
-            <div className="flex min-h-screen w-full max-w-[1600px] mx-auto border-x border-border/30 shadow-[0_0_80px_-10px_rgba(255,255,255,0.2)] bg-background">
-              {/* Sidebar */}
-              <Sidebar />
+        <AuthProvider>
+          <I18nProvider>
+            <ToastProvider>
+              <div className="flex min-h-screen w-full max-w-[1600px] mx-auto border-x border-border/30 shadow-[0_0_80px_-10px_rgba(255,255,255,0.2)] bg-background">
+                {/* Sidebar */}
+                <Sidebar />
 
-              {/* Main Content Area */}
-              <main className="flex-1 transition-all duration-300 ease-in-out w-full">
-                {children}
-              </main>
-            </div>
-          </ToastProvider>
-        </I18nProvider>
+                {/* Main Content Area */}
+                <main className="flex-1 transition-all duration-300 ease-in-out w-full">
+                  {children}
+                </main>
+              </div>
+            </ToastProvider>
+          </I18nProvider>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -17,7 +17,10 @@ export interface PlaygroundResult {
     durationMs: number;
 }
 
-export async function executePlaygroundCode(code: string): Promise<PlaygroundResult> {
+
+import { withAuth } from "@/lib/auth-middleware";
+
+export const executePlaygroundCode = withAuth(async (user, code: string): Promise<PlaygroundResult> => {
     const logs: string[] = [];
     const startTime = Date.now();
 
@@ -73,4 +76,4 @@ export async function executePlaygroundCode(code: string): Promise<PlaygroundRes
             durationMs: Date.now() - startTime
         };
     }
-}
+});

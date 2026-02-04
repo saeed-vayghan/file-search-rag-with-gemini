@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getLibraryFilesAction } from "@/actions/file-actions";
 import { ArrowLeft, Send, Paperclip, Trash2, FolderOpen, Loader2, Shield, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -38,8 +39,10 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
     // Fetch Library Info
     useEffect(() => {
         async function loadLib() {
-            const { library } = await getLibraryFilesAction(libraryId);
-            if (library) setLibraryInfo(library);
+            const result = await getLibraryFilesAction(libraryId);
+            if (!("error" in result) && result.library) {
+                setLibraryInfo(result.library);
+            }
         }
         loadLib();
     }, [libraryId]);
@@ -48,9 +51,11 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
     useEffect(() => {
         async function loadHistory() {
             setMessages([]);
-            const { messages: history, hasMore: more } = await getChatHistoryAction(libraryId, "library");
-            setMessages(history);
-            setHasMore(more);
+            const histRes = await getChatHistoryAction(libraryId, "library");
+            if (!('error' in histRes)) {
+                setMessages(histRes.messages);
+                setHasMore(histRes.hasMore);
+            }
         }
         loadHistory();
     }, [libraryId]);
@@ -62,11 +67,11 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
         // @ts-ignore
         const before = oldestMessage.createdAt;
 
-        const { messages: olderMessages, hasMore: more } = await getChatHistoryAction(libraryId, "library", before);
+        const histRes = await getChatHistoryAction(libraryId, "library", before);
 
-        if (olderMessages.length > 0) {
-            setMessages(prev => [...olderMessages, ...prev]);
-            setHasMore(more);
+        if (!('error' in histRes) && histRes.messages.length > 0) {
+            setMessages(prev => [...histRes.messages, ...prev]);
+            setHasMore(histRes.hasMore);
         } else {
             setHasMore(false);
         }
@@ -97,12 +102,18 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
 
         try {
             const result = await sendMessageAction(libraryId, "library", messages, input, chatMode);
-            if (result.error) {
+
+            if (!("reply" in result) || !result.reply) {
+                // Auth failure or complete error  
                 setMessages((prev) => [
                     ...prev,
-                    { role: "assistant", content: `${t.common.error}: ${result.error}` },
+                    { role: "assistant", content: `${t.common.error}: ${result.error || "Unknown error"}` },
                 ]);
             } else {
+                // Success
+                if (result.error) {
+                    toast.error(result.error);
+                }
                 setMessages((prev) => [
                     ...prev,
                     {

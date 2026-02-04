@@ -38,7 +38,7 @@ export function LibrariesView({ libraries: initialLibraries }: LibraryViewProps)
 
         try {
             const res = await deleteLibraryAction(deleteId);
-            if (res.success) {
+            if ('success' in res && res.success) {
                 setLibraries(prev => prev.filter(l => l.id !== deleteId));
                 setDeleteId(null);
                 toast({

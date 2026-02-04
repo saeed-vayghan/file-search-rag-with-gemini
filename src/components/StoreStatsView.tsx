@@ -40,7 +40,7 @@ export function StoreStatsView({ initialStore }: StoreStatsViewProps) {
         setIsSyncing(true);
         try {
             const result = await getStoreStatusAction(true); // FORCE SYNC
-            if (result.success && result.store) {
+            if ("success" in result && result.success && result.store) {
                 setStore(result.store as any);
                 toast({
                     title: "Sync Complete",

@@ -27,7 +27,15 @@ export default function PlaygroundPage() {
         // Clear previous result partially? Keep it until new one arrives?
         try {
             const res = await executePlaygroundCode(code);
-            setResult(res);
+            if ('error' in res) {
+                setResult({
+                    success: false,
+                    logs: [`Execution Error: ${res.error}`],
+                    durationMs: 0
+                });
+            } else {
+                setResult(res);
+            }
         } catch (e) {
             console.error("Run failed:", e);
         } finally {

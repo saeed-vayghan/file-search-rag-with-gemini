@@ -31,7 +31,7 @@ export function FileActionsMenu({ fileId, fileName }: FileActionsMenuProps) {
         setIsLoading(true);
         try {
             const result = await checkFileStatusAction(fileId);
-            if (result.error) {
+            if ('error' in result) {
                 toast({
                     title: t.common.error,
                     description: result.error,
@@ -66,7 +66,7 @@ export function FileActionsMenu({ fileId, fileName }: FileActionsMenuProps) {
         setIsLoading(true);
         try {
             const result = await deleteFileAction(fileId);
-            if (result.error) {
+            if ('error' in result) {
                 toast({
                     title: "Deletion Failed",
                     description: result.error,

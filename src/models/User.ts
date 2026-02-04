@@ -4,6 +4,9 @@ export interface IUser extends Document {
     email: string;
     name: string;
     image?: string;
+    googleId?: string; // Google account unique ID
+    emailVerified?: Date; // Email verification timestamp
+    lastLogin?: Date; // Track login activity
     primaryStoreId?: mongoose.Types.ObjectId; // Link to the formal Store model
     tier: string; // FREE, TIER_1, TIER_2, TIER_3
     settings?: {
@@ -22,6 +25,9 @@ const UserSchema: Schema<IUser> = new Schema(
         email: { type: String, required: true, unique: true },
         name: { type: String, required: true },
         image: { type: String },
+        googleId: { type: String, unique: true, sparse: true }, // OAuth ID
+        emailVerified: { type: Date }, // OAuth verification
+        lastLogin: { type: Date }, // Track activity
         primaryStoreId: { type: Schema.Types.ObjectId, ref: "Store" }, // Formal relationship
         tier: { type: String, default: "TIER_1" }, // FREE, TIER_1, TIER_2, TIER_3
         settings: {

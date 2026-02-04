@@ -3,14 +3,12 @@
 import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import FileModel from "@/models/File";
+import Library from "@/models/Library";
 import { GoogleAIService } from "@/lib/google-ai";
 import { logChatRequest, logChatResponse, logDebug } from "@/lib/logger";
-
+import { withAuth } from "@/lib/auth-middleware";
 import Message from "@/models/Message";
 import { revalidatePath } from "next/cache";
-
-// Mock User Email for now (Auth integration later)
-const USER_EMAIL = "saeed@example.com";
 
 export type ChatMessage = {
     id?: string;
@@ -20,20 +18,21 @@ export type ChatMessage = {
     createdAt?: string;
 };
 
-export async function sendMessageAction(
+export const sendMessageAction = withAuth(async (
+    user,
     contextId: string,
     scope: "file" | "library" | "global",
     history: ChatMessage[],
     newMessage: string,
     mode?: "limited" | "auxiliary"
-): Promise<{ reply: string; citations?: any[]; error?: string }> {
+): Promise<{ reply: string; citations?: any[]; error?: string }> => {
     await connectToDatabase();
 
     try {
-        // 1. Get User and their Store
-        const user = await User.findOne({ email: USER_EMAIL }).populate("primaryStoreId");
+        // User already authenticated, get populated store
+        const userWithStore = await User.findById(user._id).populate("primaryStoreId");
 
-        if (!user || !user.primaryStoreId) {
+        if (!userWithStore || !userWithStore.primaryStoreId) {
             return {
                 reply: "",
                 error: "No document store found. Please upload a document first.",
@@ -42,7 +41,7 @@ export async function sendMessageAction(
 
         // Access the populated Store document
         // @ts-ignore
-        const googleStoreId = user.primaryStoreId.googleStoreId;
+        const googleStoreId = userWithStore.primaryStoreId.googleStoreId;
 
         if (!googleStoreId) {
             return {
@@ -80,7 +79,8 @@ export async function sendMessageAction(
             role: "user",
             content: newMessage,
             scope,
-            mode: requestedMode // Save mode to message for auditing/history if needed (future schema update)
+            mode: requestedMode,
+            userId: user._id,
         };
         if (scope === "file") messageData.fileId = contextId;
         if (scope === "library") messageData.libraryId = contextId;
@@ -184,21 +184,34 @@ export async function sendMessageAction(
             error: error instanceof Error ? error.message : "Failed to process your question. Please try again.",
         };
     }
-}
+});
 
-export async function getChatHistoryAction(
+
+
+export const getChatHistoryAction = withAuth(async (
+    user,
     contextId: string,
     scope: "file" | "library" | "global",
     before?: string, // ISO Date string
     limit: number = 50
-): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+): Promise<{ messages: ChatMessage[]; hasMore: boolean; error?: string }> => {
     await connectToDatabase();
     try {
         const query: any = { scope };
-        if (scope === "file") query.fileId = contextId;
-        if (scope === "library") query.libraryId = contextId;
-        // Global scope: query by userId (implicit/mock)? Or just scope='global' for this user?
-        // Ideally enforce userId filter too when auth is real.
+
+        // Enforce Ownership Verification
+        if (scope === "file") {
+            const file = await FileModel.findOne({ _id: contextId, userId: user._id }).select("_id");
+            if (!file) return { messages: [], hasMore: false, error: "Access denied" };
+            query.fileId = contextId;
+        } else if (scope === "library") {
+            const lib = await Library.findOne({ _id: contextId, userId: user._id }).select("_id");
+            if (!lib) return { messages: [], hasMore: false, error: "Access denied" };
+            query.libraryId = contextId;
+        } else if (scope === "global") {
+            // Enforce User Isolation for Global Chat
+            query.userId = user._id;
+        }
 
         if (before) {
             query.createdAt = { $lt: new Date(before) };
@@ -231,28 +244,38 @@ export async function getChatHistoryAction(
         console.error("Get History Failed:", error);
         return { messages: [], hasMore: false };
     }
-}
+});
 
 export type DeleteHistoryOptions =
     | { mode: "all" }
     | { mode: "range"; from: string; to: string }; // ISO Date strings
 
-export async function deleteChatHistoryAction(
+export const deleteChatHistoryAction = withAuth(async (
+    user,
     contextId: string,
     scope: "file" | "library" | "global",
     options: DeleteHistoryOptions
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string }> => {
     await connectToDatabase();
     try {
         const query: any = { scope };
-        if (scope === "file") query.fileId = contextId;
-        if (scope === "library") query.libraryId = contextId;
+
+        // Enforce Ownership Verification
+        if (scope === "file") {
+            const file = await FileModel.findOne({ _id: contextId, userId: user._id }).select("_id");
+            if (!file) return { success: false, error: "Access denied" };
+            query.fileId = contextId;
+        } else if (scope === "library") {
+            const lib = await Library.findOne({ _id: contextId, userId: user._id }).select("_id");
+            if (!lib) return { success: false, error: "Access denied" };
+            query.libraryId = contextId;
+        } else if (scope === "global") {
+            query.userId = user._id;
+        }
 
         if (options.mode === "range") {
             const fromDate = new Date(options.from);
             const toDate = new Date(options.to);
-            // Set toDate to end of day if it's just a date string, or strictly use provided time
-            // Assuming inclusive range
             query.createdAt = {
                 $gte: fromDate,
                 $lte: toDate
@@ -261,10 +284,11 @@ export async function deleteChatHistoryAction(
 
         await Message.deleteMany(query);
         if (scope === "file") revalidatePath(`/chat/${contextId}`);
+        // Can also revalidate /chat/global and /chat/library/[id] if paths known
 
         return { success: true };
     } catch (error) {
         console.error("Delete History Failed:", error);
         return { success: false, error: "Failed to delete history" };
     }
-}
+});

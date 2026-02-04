@@ -5,6 +5,15 @@ import { SettingsView } from "@/components/SettingsView";
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-    const userStats = await getUserStatsAction();
+    const { auth } = await import("@/lib/auth");
+    const session = await auth();
+    const result = await getUserStatsAction();
+    const userStats = ("error" in result) ? { name: "Guest", totalDocs: 0, storageUsed: "0 KB", storageLimit: "1 GB" } : result;
+
+    // Inject session expiry into userStats for display
+    if (session?.expires) {
+        (userStats as any).expires = session.expires;
+    }
+
     return <SettingsView userStats={userStats} />;
 }

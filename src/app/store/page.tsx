@@ -13,7 +13,7 @@ export default function StorePage() {
     useEffect(() => {
         async function loadStore() {
             const result = await getStoreStatusAction();
-            if (result.success && result.store) {
+            if ("success" in result && result.success && result.store) {
                 setStoreData(result.store);
             } else {
                 setError(result.error || "Failed to load store data");

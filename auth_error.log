@@ -1,0 +1,19 @@
+[2026-02-04T20:19:55.322Z] ValidationError: userId: Path `userId` is required.
+Details: {
+  "errors": {
+    "userId": {
+      "name": "ValidatorError",
+      "message": "Path `userId` is required.",
+      "properties": {
+        "message": "Path `userId` is required.",
+        "type": "required",
+        "path": "userId"
+      },
+      "kind": "required",
+      "path": "userId"
+    }
+  },
+  "_message": "Store validation failed",
+  "name": "ValidationError",
+  "message": "Store validation failed: userId: Path `userId` is required."
+}

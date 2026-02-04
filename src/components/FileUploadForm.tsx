@@ -30,7 +30,9 @@ export function FileUploadForm() {
     useEffect(() => {
         async function loadLibraries() {
             const libs = await getLibrariesAction();
-            setLibraries(libs);
+            if (!("error" in libs)) {
+                setLibraries(libs);
+            }
         }
         loadLibraries();
     }, []);
@@ -74,6 +76,12 @@ export function FileUploadForm() {
             // 2. Check for Duplicates (Client-side Check)
             const { checkFileDuplicate } = await import("@/actions/file-actions");
             const duplicate = await checkFileDuplicate(hash, selectedLibrary);
+
+            if ('error' in duplicate) {
+                setStatus("error");
+                setErrorMessage(duplicate.error || "Failed to check duplicates");
+                return;
+            }
 
             if (duplicate.exists) {
                 setStatus("error");

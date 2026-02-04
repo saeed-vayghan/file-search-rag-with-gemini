@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, deleteChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getFileAction } from "@/actions/file-actions";
 import { ArrowLeft, Send, Paperclip, MoreVertical, Search, FileText, Loader2, Clock, HardDrive, CheckCircle, Download, Trash2, Calendar as CalendarIcon, Shield, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
 import { ChatCalendar } from "@/components/chat/ChatCalendar";
 import { DateSeparator } from "@/components/chat/DateSeparator";
@@ -55,9 +56,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             if (!fileId) return;
             // Clear current messages to prevent hydration mismatch if re-entering
             setMessages([]);
-            const { messages: history, hasMore: more } = await getChatHistoryAction(fileId, "file");
-            setMessages(history);
-            setHasMore(more);
+            const histRes = await getChatHistoryAction(fileId, "file");
+            if (!('error' in histRes)) {
+                setMessages(histRes.messages);
+                setHasMore(histRes.hasMore);
+            }
         }
         loadHistory();
     }, [fileId]);
@@ -69,11 +72,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         // @ts-ignore
         const before = oldestMessage.createdAt;
 
-        const { messages: olderMessages, hasMore: more } = await getChatHistoryAction(fileId, "file", before);
+        const histRes = await getChatHistoryAction(fileId, "file", before);
 
-        if (olderMessages.length > 0) {
-            setMessages(prev => [...olderMessages, ...prev]);
-            setHasMore(more);
+        if (!('error' in histRes) && histRes.messages.length > 0) {
+            setMessages(prev => [...histRes.messages, ...prev]);
+            setHasMore(histRes.hasMore);
         } else {
             setHasMore(false);
         }
@@ -98,9 +101,11 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         // Jump to date: Load messages before end of that day
         const targetDate = new Date(date);
         targetDate.setDate(targetDate.getDate() + 1); // Next day to include all of selected day
-        const { messages: newMessages, hasMore: more } = await getChatHistoryAction(fileId, "file", targetDate.toISOString(), 50);
-        setMessages(newMessages);
-        setHasMore(more);
+        const histRes = await getChatHistoryAction(fileId, "file", targetDate.toISOString(), 50);
+        if (!('error' in histRes)) {
+            setMessages(histRes.messages);
+            setHasMore(histRes.hasMore);
+        }
         // We might want to scroll to specific message here, but simpler is just loading context
     };
 
@@ -109,7 +114,10 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         async function loadFile() {
             setLoadingFile(true);
             const info = await getFileAction(fileId);
-            setFileInfo(info);
+            if (info && !("error" in info)) {
+                // @ts-ignore
+                setFileInfo(info);
+            }
             setLoadingFile(false);
         }
         loadFile();
@@ -126,12 +134,18 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
         try {
             const result = await sendMessageAction(fileId, "file", messages, input, chatMode);
-            if (result.error) {
+
+            if (!("reply" in result) || !result.reply) {
+                // Auth failure or complete error
                 setMessages((prev) => [
                     ...prev,
-                    { role: "assistant", content: `${t.common.error}: ${result.error}` },
+                    { role: "assistant", content: `${t.common.error}: ${result.error || "Unknown error"}` },
                 ]);
             } else {
+                // Success
+                if (result.error) {
+                    toast.error(result.error);
+                }
                 setMessages((prev) => [
                     ...prev,
                     {

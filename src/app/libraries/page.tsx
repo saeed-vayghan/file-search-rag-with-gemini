@@ -5,6 +5,7 @@ import { LibrariesView } from "@/components/LibrariesView";
 export const dynamic = 'force-dynamic';
 
 export default async function LibrariesPage() {
-    const libraries = await getLibrariesAction();
+    const result = await getLibrariesAction();
+    const libraries = ("error" in result) ? [] : result;
     return <LibrariesView libraries={libraries} />;
 }
