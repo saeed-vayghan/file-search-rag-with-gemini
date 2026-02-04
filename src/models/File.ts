@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { FILE_STATUS } from "@/config/constants";
+import type { FileStatusType } from "@/config/constants";
 
-export type FileStatus = "UPLOADING" | "INGESTING" | "ACTIVE" | "FAILED";
+export type FileStatus = FileStatusType;
 
 export interface IFile extends Document {
     userId: mongoose.Types.ObjectId;
@@ -8,7 +10,7 @@ export interface IFile extends Document {
     displayName: string;
     mimeType: string;
     sizeBytes: number;
-    status: FileStatus;
+    status: FileStatusType;
 
     // Google Cloud References
     googleFileId?: string; // "files/..."
@@ -34,8 +36,8 @@ const FileSchema: Schema<IFile> = new Schema(
         sizeBytes: { type: Number, required: true },
         status: {
             type: String,
-            enum: ["UPLOADING", "INGESTING", "ACTIVE", "FAILED"],
-            default: "UPLOADING",
+            enum: Object.values(FILE_STATUS),
+            default: FILE_STATUS.UPLOADING,
         },
         googleFileId: { type: String },
         googleUri: { type: String },

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { UI_DEFAULTS } from "@/config/constants";
 
 export interface ILibrary extends Document {
     userId: mongoose.Types.ObjectId;
@@ -15,8 +16,8 @@ const LibrarySchema: Schema<ILibrary> = new Schema(
         userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
         name: { type: String, required: true },
         description: { type: String },
-        icon: { type: String, default: "📁" },
-        color: { type: String, default: "text-slate-500" },
+        icon: { type: String, default: UI_DEFAULTS.LIBRARY.ICON },
+        color: { type: String, default: UI_DEFAULTS.LIBRARY.COLOR },
     },
     { timestamps: true }
 );

@@ -9,9 +9,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { FileUploadForm } from "@/components/FileUploadForm";
 import { FileActionsMenu } from "@/components/FileActionsMenu";
-import type { FileStatus } from "@/lib/mock-data";
 import { useI18n } from "@/lib/i18n";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
+import { FILE_STATUS, UI_DEFAULTS, PATHS, FileStatusType as FileStatus } from "@/config/constants";
 import { Check, Lock, Zap } from "lucide-react";
 import {
     getFilesAction,
@@ -20,8 +20,23 @@ import {
     uploadFileAction
 } from "@/actions/file-actions";
 
+
+interface DashboardFile {
+    id: string;
+    displayName: string;
+    mimeType: string;
+    type: string;
+    sizeBytes: number;
+    size: string;
+    status: string;
+    date: string;
+    libraryName?: string;
+    libraryIcon?: string;
+    libraryId?: string;
+}
+
 interface DashboardViewProps {
-    files: any[];
+    files: DashboardFile[];
     userStats: any;
     libraries: any[];
 }
@@ -156,7 +171,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium">{t.libraries.title}</h3>
-                        <Link href="/libraries">
+                        <Link href={PATHS.LIBRARIES}>
                             <Button variant="outline" size="sm" className="gap-2">
                                 {t.libraries.title}
                                 <FolderOpen className="h-4 w-4" />
@@ -232,7 +247,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                 < div className="space-y-4" >
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium">{t.dashboard.recentFiles}</h3>
-                        <Link href="/search">
+                        <Link href={PATHS.SEARCH}>
                             <Button variant="outline" size="sm">{t.nav.search}</Button>
                         </Link>
                     </div>
@@ -271,18 +286,14 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                                                 </div>
                                             </td>
                                             <td className="p-4 text-muted-foreground">
-                                                {/* @ts-ignore */}
                                                 {file.libraryId ? (
-                                                    // @ts-ignore
                                                     <Link href={`/libraries/${file.libraryId}`} className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
-                                                        {/* @ts-ignore */}
                                                         <span>{file.libraryIcon}</span>
-                                                        {/* @ts-ignore */}
                                                         <span>{file.libraryName}</span>
                                                     </Link>
                                                 ) : (
                                                     <span className="flex items-center gap-1.5 opacity-50">
-                                                        <span>📁</span>
+                                                        <span>{UI_DEFAULTS.LIBRARY.ICON}</span>
                                                         <span>Uncategorized</span>
                                                     </span>
                                                 )}
@@ -337,12 +348,12 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
 
 function StatusBadge({ status }: { status: FileStatus }) {
     switch (status) {
-        case "ACTIVE":
+        case FILE_STATUS.ACTIVE:
             return <Badge variant="success">Active</Badge>;
-        case "INGESTING":
-        case "UPLOADING":
+        case FILE_STATUS.INGESTING:
+        case FILE_STATUS.UPLOADING:
             return <Badge variant="warning">Processing</Badge>;
-        case "FAILED":
+        case FILE_STATUS.FAILED:
             return <Badge variant="destructive">Failed</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;

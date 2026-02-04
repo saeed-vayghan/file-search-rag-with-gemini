@@ -8,8 +8,8 @@ import { updateLibraryAction } from "@/actions/file-actions";
 import { X, Loader2, Pencil } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { UI_DEFAULTS } from "@/config/constants";
 
-const ICON_OPTIONS = ["📁", "📄", "📊", "💼", "📚", "💰", "⚖️", "🏥", "🎓", "🔧"];
 const COLOR_OPTIONS = [
     { name: "Slate", value: "text-slate-500" },
     { name: "Blue", value: "text-blue-500" },
@@ -115,7 +115,7 @@ export function EditLibraryModal({ isOpen, onClose, library }: EditLibraryModalP
                     <div>
                         <label className="text-sm text-slate-400 mb-2 block">Icon</label>
                         <div className="flex flex-wrap gap-2">
-                            {ICON_OPTIONS.map((icon) => (
+                            {UI_DEFAULTS.LIBRARY.ICONS.map((icon) => (
                                 <button
                                     key={icon}
                                     type="button"

@@ -69,7 +69,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         if (!hasMore || messages.length === 0) return;
 
         const oldestMessage = messages[0];
-        // @ts-ignore
         const before = oldestMessage.createdAt;
 
         const histRes = await getChatHistoryAction(fileId, "file", before);
@@ -115,7 +114,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             setLoadingFile(true);
             const info = await getFileAction(fileId);
             if (info && !("error" in info)) {
-                // @ts-ignore
                 setFileInfo(info);
             }
             setLoadingFile(false);

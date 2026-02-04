@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { CHAT_CONSTANTS } from "@/config/constants";
 
 export interface IUser extends Document {
     email: string;
@@ -33,11 +34,11 @@ const UserSchema: Schema<IUser> = new Schema(
         settings: {
             chatModes: {
                 limited: {
-                    instruction: { type: String, default: "Answer ONLY using the provided context. Do not use outside knowledge. If the answer is not found, say so." },
+                    instruction: { type: String, default: CHAT_CONSTANTS.MODES.LIMITED.DEFAULT_INSTRUCTION },
                     enabled: { type: Boolean, default: true }
                 },
                 auxiliary: {
-                    instruction: { type: String, default: "Use the provided context as a primary source, but feel free to expand with your general knowledge to provide a helpful answer." },
+                    instruction: { type: String, default: CHAT_CONSTANTS.MODES.AUXILIARY.DEFAULT_INSTRUCTION },
                     enabled: { type: Boolean, default: true }
                 }
             },

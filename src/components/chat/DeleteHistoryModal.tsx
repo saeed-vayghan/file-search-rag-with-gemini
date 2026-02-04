@@ -107,7 +107,6 @@ export function DeleteHistoryModal({ fileId, isOpen, onClose, onDeleted }: Delet
                         Cancel
                     </Button>
                     <Button
-                        // @ts-ignore - variant destructive not in types but might be supported or fall back
                         variant="destructive"
                         className="bg-red-600 hover:bg-red-700"
                         onClick={handleDelete}

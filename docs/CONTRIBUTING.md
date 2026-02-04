@@ -23,6 +23,7 @@ Thank you for your interest in contributing! This guide will help you understand
 - **Icons**: Lucide React
 - **State Management**: React Hooks (useState, useEffect)
 - **Routing**: Next.js App Router (file-based)
+- **Auth**: NextAuth.js v5 (Google OAuth)
 
 ### Directory Structure
 
@@ -168,6 +169,7 @@ Server Actions replace traditional API routes. They are marked with `"use server
 #### **user-actions.ts**
 - `getUserSettingsAction()`: Fetch user settings
 - `updateUserSettingsAction()`: Save settings changes
+- `updateUserAction()`: Update user profile (name, etc.)
 
 #### **playground.ts**
 - `executePlaygroundAction()`: Execute Google API code in sandbox
@@ -206,17 +208,38 @@ All models use **Mongoose** for MongoDB:
 - **File**: File metadata, googleFileId, libraryId, hash
 - **Message**: Chat history with scope (global/library/file)
 
-### Middleware
+### Authentication & Middleware
 
-This project doesn't use traditional middleware. Authentication and request handling are done at the Server Action level.
+**Framework**: NextAuth.js v5 (Beta)
 
-Current pattern:
+**Location**:
+- Config: `src/lib/auth.ts`
+- Middleware Wrapper: `src/lib/auth-middleware.ts`
+- Helpers: `src/lib/auth-helpers.ts`
+
+**Pattern**:
+Instead of global middleware for all routes, we use a **Higher-Order Function (HOF)** pattern for Server Actions to ensure type-safe, secure execution.
+
+**`withAuth` Wrapper**:
+Every secure Server Action must be wrapped with `withAuth`. This wrapper:
+1. Verifies the user's session
+2. Redirects to `/auth/signin` if unauthorized (or throws error)
+3. Injects the hydrated `User` Mongoose document as the first argument
+
+**Example**:
 ```typescript
-const USER_EMAIL = "saeed@example.com"; // Mock auth
-const user = await User.findOne({ email: USER_EMAIL });
+import { withAuth } from "@/lib/auth-middleware";
+
+export const mySecureAction = withAuth(async (user, data: string) => {
+    // `user` is guaranteed to be a valid IUser Mongoose document
+    console.log("Acting on behalf of:", user.email);
+    return { success: true };
+});
 ```
 
-**TODO**: Replace with proper auth (NextAuth.js or Clerk)
+**Redirects**:
+- Unauthenticated users are automatically redirected to the Google Sign-in page.
+- Session expiration is handled automatically by NextAuth.
 
 ---
 
@@ -308,8 +331,14 @@ MONGO_URI=mongodb://localhost:27017/file-search
 
 **Development** (`.env`):
 ```bash
-GOOGLE_API_KEY=your_api_key
+GOOGLE_API_KEY=your_gemini_api_key
 MONGO_URI=mongodb://localhost:27017/file-search
+
+# NextAuth.js & Google OAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_random_secret_string
+GOOGLE_CLIENT_ID=your_google_cloud_client_id
+GOOGLE_CLIENT_SECRET=your_google_cloud_client_secret
 ```
 
 **Production** (Docker Compose):

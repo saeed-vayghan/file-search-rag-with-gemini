@@ -1,11 +1,12 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { CHAT_SCOPES, CHAT_ROLES, ChatScopeType, ChatRoleType } from "@/config/constants";
 
 export interface IMessage extends Document {
     fileId?: mongoose.Types.ObjectId;
     libraryId?: mongoose.Types.ObjectId;
     userId?: mongoose.Types.ObjectId;
-    scope: "file" | "library" | "global";
-    role: "user" | "assistant";
+    scope: ChatScopeType;
+    role: ChatRoleType;
     content: string;
     citations?: { id: number; uri?: string; title?: string }[];
 
@@ -34,13 +35,13 @@ const MessageSchema = new Schema<IMessage>(
         },
         scope: {
             type: String,
-            enum: ["file", "library", "global"],
-            default: "file",
+            enum: Object.values(CHAT_SCOPES),
+            default: CHAT_SCOPES.FILE,
             required: true,
         },
         role: {
             type: String,
-            enum: ["user", "assistant"],
+            enum: Object.values(CHAT_ROLES),
             required: true,
         },
         content: {

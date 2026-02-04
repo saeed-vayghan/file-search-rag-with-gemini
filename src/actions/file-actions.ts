@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
@@ -13,11 +12,11 @@ import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
+import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES } from "@/config/constants";
 
 
 export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
     try {
-        await connectToDatabase();
 
         const query: any = { contentHash: hash, userId: user._id };
         if (libraryId) {
@@ -38,15 +37,13 @@ export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?
 
         return { exists: false };
     } catch (error) {
-        console.error("Error checking duplicate:", error);
+        console.error(LOG_MESSAGES.FILE.CHECK_DUPLICATE_FAIL, error);
         return { exists: false };
     }
 });
 
 
 export const uploadFileAction = withAuth(async (user, formData: FormData) => {
-    await connectToDatabase();
-
     const file = formData.get("file") as File | null;
     let libraryId = formData.get("libraryId") as string;
     const contentHash = formData.get("contentHash") as string;
@@ -54,14 +51,14 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     // Rule: Uncategorized files are not allowed.
     if (!libraryId || libraryId === "null" || libraryId === "undefined") {
         // Find or Create Default Library
-        let defaultLib = await Library.findOne({ userId: user._id, name: "Default" });
+        let defaultLib = await Library.findOne({ userId: user._id, name: LIBRARY_DEFAULTS.NAME });
         if (!defaultLib) {
             defaultLib = await Library.create({
                 userId: user._id,
-                name: "Default",
-                icon: "📁",
-                color: "text-slate-500",
-                description: "Auto-created default library"
+                name: LIBRARY_DEFAULTS.NAME,
+                icon: UI_DEFAULTS.LIBRARY.ICON,
+                color: UI_DEFAULTS.LIBRARY.COLOR,
+                description: LIBRARY_DEFAULTS.DESCRIPTION
             });
         }
         libraryId = defaultLib._id.toString();
@@ -131,7 +128,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
             displayName: file.name,
             mimeType: file.type,
             sizeBytes: file.size,
-            status: "UPLOADING",
+            status: FILE_STATUS.UPLOADING,
             contentHash: contentHash || undefined
         });
         newFileId = newFile._id.toString();
@@ -151,7 +148,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
             // Check if Store is missing/expired (403/404)
             const status = error.status || error.code || error?.error?.code;
             if (status === 403 || status === 404) {
-                console.warn("[Upload] Store not found or permission denied. Re-creating store...");
+                console.warn(LOG_MESSAGES.FILE.UPLOAD_STORE_RETRY);
 
                 // Create new store on Google
                 const newGoogleStoreName = await GoogleAIService.createStore(`resync-store-${user.email}`);
@@ -204,19 +201,19 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         // 10. Cleanup Temp
         await unlink(tempPath);
 
-        revalidatePath("/");
+        revalidatePath(PATHS.HOME);
         return { success: true, fileId: newFile._id.toString() };
 
     } catch (error) {
-        console.error("Upload Action Failed:", error);
+        console.error(LOG_MESSAGES.FILE.UPLOAD_FAIL, error);
 
         // Cleanup Orphaned Record
         if (newFileId) {
             try {
-                console.warn(`[Upload] Cleaning up orphaned file record: ${newFileId}`);
+                console.warn(`${LOG_MESSAGES.FILE.CLEANUP_ORPHAN} ${newFileId}`);
                 await FileModel.findByIdAndDelete(newFileId);
             } catch (cleanupError) {
-                console.error("Failed to cleanup orphaned record:", cleanupError);
+                console.error(LOG_MESSAGES.FILE.CLEANUP_ORPHAN_FAIL, cleanupError);
             }
         }
 
@@ -226,51 +223,43 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
 
 
 export const getFilesAction = withAuth(async (user) => {
-    await connectToDatabase();
     const files = await FileModel.find({ userId: user._id })
         .sort({ createdAt: -1 })
         .populate("libraryId", "name icon")
         .lean();
 
-    return files.map(f => ({
+    return files.map((f: any) => ({
         id: f._id.toString(),
         displayName: f.displayName,
         mimeType: f.mimeType,
         type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
-        // @ts-ignore
         sizeBytes: f.sizeBytes,
-        // @ts-ignore
         size: (f.sizeBytes / 1024).toFixed(1) + " KB",
         status: f.status,
-        // @ts-ignore
-        date: f.createdAt.toISOString().split("T")[0],
-        // @ts-ignore
+        date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
         libraryName: f.libraryId?.name || "Uncategorized",
-        // @ts-ignore
-        libraryIcon: f.libraryId?.icon || "📁",
-        // @ts-ignore
+        libraryIcon: f.libraryId?.icon || UI_DEFAULTS.LIBRARY.ICON,
         libraryId: f.libraryId?._id?.toString(),
     }));
 });
 
 export const getFileAction = withAuth(async (user, fileId: string) => {
-    await connectToDatabase();
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id }).lean();
         if (!file) return null;
 
+        const f = file as any; // Cast for lean properties
+
         return {
-            id: file._id.toString(),
-            displayName: file.displayName,
-            mimeType: file.mimeType,
-            type: file.mimeType.split("/")[1]?.toUpperCase() || "DOC",
-            // @ts-ignore
-            sizeBytes: file.sizeBytes,
-            size: (file.sizeBytes / 1024).toFixed(1) + " KB",
-            status: file.status,
-            // @ts-ignore
-            date: file.createdAt.toISOString().split("T")[0],
-            googleUri: file.googleUri,
+            id: f._id.toString(),
+            displayName: f.displayName,
+            mimeType: f.mimeType,
+            type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
+            sizeBytes: f.sizeBytes,
+            size: (f.sizeBytes / 1024).toFixed(1) + " KB",
+            status: f.status,
+            date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
+            googleUri: f.googleUri,
         };
     } catch {
         return null;
@@ -278,7 +267,6 @@ export const getFileAction = withAuth(async (user, fileId: string) => {
 });
 
 export const getUserStatsAction = withAuth(async (user) => {
-    await connectToDatabase();
     const userDoc = await User.findById(user._id);
     if (!userDoc) {
         return {
@@ -310,7 +298,6 @@ export const getUserStatsAction = withAuth(async (user) => {
 
 
 export const getLibrariesAction = withAuth(async (user) => {
-    await connectToDatabase();
     // Get real libraries from DB
     const libraries = await Library.find({ userId: user._id }).lean();
 
@@ -325,8 +312,8 @@ export const getLibrariesAction = withAuth(async (user) => {
                 id: lib._id.toString(),
                 name: lib.name,
                 description: lib.description || "",
-                icon: lib.icon || "📁",
-                color: lib.color || "text-slate-500",
+                icon: lib.icon || UI_DEFAULTS.LIBRARY.ICON,
+                color: lib.color || UI_DEFAULTS.LIBRARY.COLOR,
                 count: fileCount,
             };
         })
@@ -336,18 +323,17 @@ export const getLibrariesAction = withAuth(async (user) => {
 });
 
 export const createLibraryAction = withAuth(async (user, name: string, icon?: string, color?: string) => {
-    await connectToDatabase();
 
     try {
         const library = await Library.create({
             userId: user._id,
             name,
-            icon: icon || "📁",
-            color: color || "text-slate-500",
+            icon: icon || UI_DEFAULTS.LIBRARY.ICON,
+            color: color || UI_DEFAULTS.LIBRARY.COLOR,
         });
 
-        revalidatePath("/");
-        revalidatePath("/libraries");
+        revalidatePath(PATHS.HOME);
+        revalidatePath(PATHS.LIBRARIES);
 
         return {
             success: true,
@@ -359,14 +345,13 @@ export const createLibraryAction = withAuth(async (user, name: string, icon?: st
             }
         };
     } catch (error) {
-        console.error("Create Library Failed:", error);
+        console.error(LOG_MESSAGES.FILE.CREATE_LIB_FAIL, error);
         return { error: "Failed to create library" };
     }
 });
 
 
 export const updateLibraryAction = withAuth(async (user, libraryId: string, name: string, icon?: string, color?: string) => {
-    await connectToDatabase();
 
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
@@ -380,9 +365,9 @@ export const updateLibraryAction = withAuth(async (user, libraryId: string, name
 
         await library.save();
 
-        revalidatePath("/");
-        revalidatePath("/libraries");
-        revalidatePath(`/libraries/${libraryId}`);
+        revalidatePath(PATHS.HOME);
+        revalidatePath(PATHS.LIBRARIES);
+        revalidatePath(`${PATHS.LIBRARIES}/${libraryId}`);
 
         return {
             success: true,
@@ -394,14 +379,13 @@ export const updateLibraryAction = withAuth(async (user, libraryId: string, name
             }
         };
     } catch (error) {
-        console.error("Update Library Failed:", error);
+        console.error(LOG_MESSAGES.FILE.UPDATE_LIB_FAIL, error);
         return { error: "Failed to update library" };
     }
 });
 
 
 export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
-    await connectToDatabase();
 
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
@@ -437,11 +421,11 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
                 if (result.success) {
                     deletedCount++;
                 } else {
-                    console.error(`[Delete Library] Failed to delete file ${file._id}: ${result.error}`);
+                    console.error(`${LOG_MESSAGES.FILE.DELETE_LIB_FILE_FAIL} ${file._id}: ${result.error}`);
                     failedCount++;
                 }
             } catch (err) {
-                console.error(`[Delete Library] Exception deleting file ${file._id}:`, err);
+                console.error(`${LOG_MESSAGES.FILE.DELETE_LIB_EXCEPTION} ${file._id}:`, err);
                 failedCount++;
             }
         }
@@ -455,12 +439,12 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
         // Delete the library only if all files are gone
         await Library.findByIdAndDelete(libraryId);
 
-        revalidatePath("/");
-        revalidatePath("/libraries");
+        revalidatePath(PATHS.HOME);
+        revalidatePath(PATHS.LIBRARIES);
 
         return { success: true, message: "Library and all files deleted" };
     } catch (error) {
-        console.error("Delete Library Failed:", error);
+        console.error(LOG_MESSAGES.FILE.DELETE_LIB_FAIL, error);
         return { error: "Failed to delete library" };
     }
 });
@@ -473,30 +457,9 @@ function formatBytes(bytes: number): string {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-function getIconForType(type: string): string {
-    switch (type.toLowerCase()) {
-        case "pdf": return "📄";
-        case "doc":
-        case "docx": return "📝";
-        case "xlsx":
-        case "csv": return "📊";
-        default: return "📁";
-    }
-}
 
-function getColorForType(type: string): string {
-    switch (type.toLowerCase()) {
-        case "pdf": return "text-red-500";
-        case "doc":
-        case "docx": return "text-blue-500";
-        case "xlsx":
-        case "csv": return "text-emerald-500";
-        default: return "text-slate-500";
-    }
-}
 
 export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
-    await connectToDatabase();
 
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id });
@@ -505,10 +468,10 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
         }
 
         // If already ACTIVE or FAILED, no need to check
-        if (file.status === "ACTIVE" || file.status === "FAILED") {
+        if (file.status === FILE_STATUS.ACTIVE || file.status === FILE_STATUS.FAILED) {
             return {
                 status: file.status,
-                message: file.status === "ACTIVE" ? "File is ready" : "Ingestion failed"
+                message: file.status === FILE_STATUS.ACTIVE ? "File is ready" : "Ingestion failed"
             };
         }
 
@@ -516,12 +479,12 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
         if (file.googleOperationName) {
             // Note: In the real implementation, we'd call getOperationStatus
             // For now, we'll mark as ACTIVE after checking
-            file.status = "ACTIVE";
+            file.status = FILE_STATUS.ACTIVE;
             await file.save();
 
-            revalidatePath("/");
+            revalidatePath(PATHS.HOME);
             return {
-                status: "ACTIVE",
+                status: FILE_STATUS.ACTIVE,
                 message: "File is now ready for search"
             };
         }
@@ -531,7 +494,7 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
             message: "Still processing..."
         };
     } catch (error) {
-        console.error("Check Status Failed:", error);
+        console.error(LOG_MESSAGES.FILE.CHECK_STATUS_FAIL, error);
         return { error: "Failed to check status" };
     }
 });
@@ -566,7 +529,7 @@ async function deleteFileInternal(user: any, fileId: string) {
                 googleStatus = deleted ? "Deleted" : "Already Cleaned";
             } catch (e) {
                 googleStatus = "Failed (Ignored)";
-                console.error("Google delete failed during cascade:", e);
+                console.error(LOG_MESSAGES.FILE.GOOGLE_DELETE_FAIL, e);
             }
         }
 
@@ -578,7 +541,7 @@ async function deleteFileInternal(user: any, fileId: string) {
                 await unlink(absolutePath);
                 localStatus = "Deleted";
             } catch (err) {
-                console.warn(`[FileAction] Local file deletion failed for ${file.localPath}:`, err);
+                console.warn(`${LOG_MESSAGES.FILE.LOCAL_DELETE_FAIL} ${file.localPath}:`, err);
                 localStatus = "Failed/Missing";
             }
         }
@@ -601,29 +564,27 @@ async function deleteFileInternal(user: any, fileId: string) {
                     await store.save();
                 }
             } catch (storeError) {
-                console.warn("[Delete] Failed to update store stats:", storeError);
+                console.warn(LOG_MESSAGES.FILE.STORE_STATS_FAIL, storeError);
             }
         }
 
-        revalidatePath("/");
+        revalidatePath(PATHS.HOME);
 
         return {
             success: true,
             message: `Cleanup Complete: Remote (${googleStatus}), Local (${localStatus}).`
         };
     } catch (error) {
-        console.error("Delete Failed:", error);
+        console.error(LOG_MESSAGES.FILE.DELETE_FAIL, error);
         return { error: "Failed to delete file" };
     }
 }
 
 export const deleteFileAction = withAuth(async (user, fileId: string) => {
-    await connectToDatabase();
     return deleteFileInternal(user, fileId);
 });
 
 export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) => {
-    await connectToDatabase();
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file || !file.googleFileId) {
@@ -641,7 +602,6 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
     }
 });
 export const getLibraryFilesAction = withAuth(async (user, libraryId: string) => {
-    await connectToDatabase();
 
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id }).lean();
@@ -653,32 +613,28 @@ export const getLibraryFilesAction = withAuth(async (user, libraryId: string) =>
             library: {
                 id: library._id.toString(),
                 name: library.name,
-                icon: library.icon || "📁",
-                color: library.color || "text-slate-500",
+                icon: library.icon || UI_DEFAULTS.LIBRARY.ICON,
+                color: library.color || UI_DEFAULTS.LIBRARY.COLOR,
                 description: library.description || "",
             },
-            files: files.map(f => ({
+            files: files.map((f: any) => ({
                 id: f._id.toString(),
                 displayName: f.displayName,
                 mimeType: f.mimeType,
                 type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
-                // @ts-ignore
                 sizeBytes: f.sizeBytes,
-                // @ts-ignore
                 size: (f.sizeBytes / 1024).toFixed(1) + " KB",
                 status: f.status,
-                // @ts-ignore
-                date: f.createdAt.toISOString().split("T")[0],
+                date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
             }))
         };
     } catch (error) {
-        console.error("Get Library Files Failed:", error);
+        console.error(LOG_MESSAGES.FILE.GET_LIB_FILES_FAIL, error);
         return { files: [], library: null };
     }
 });
 
 export const getStoreStatusAction = withAuth(async (user, force: boolean = false) => {
-    await connectToDatabase();
     if (!user.primaryStoreId) {
         return { error: "No store found" };
     }
@@ -719,13 +675,12 @@ export const getStoreStatusAction = withAuth(async (user, force: boolean = false
             }
         };
     } catch (error) {
-        console.error("Get Store Status Failed:", error);
+        console.error(LOG_MESSAGES.FILE.GET_STORE_STATUS_FAIL, error);
         return { error: "Failed to fetch store status" };
     }
 });
 
 export const purgeUserDataAction = withAuth(async (user) => {
-    await connectToDatabase();
 
     try {
         logDangerousOperation("PURGE", `Starting Purge for User: ${user.email}`);

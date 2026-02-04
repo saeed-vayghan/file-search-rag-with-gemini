@@ -8,8 +8,8 @@ import { createLibraryAction } from "@/actions/file-actions";
 import { X, Loader2, FolderPlus } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { UI_DEFAULTS } from "@/config/constants";
 
-const ICON_OPTIONS = ["📁", "📄", "📊", "💼", "📚", "💰", "⚖️", "🏥", "🎓", "🔧"];
 const COLOR_OPTIONS = [
     { name: "Slate", value: "text-slate-500" },
     { name: "Blue", value: "text-blue-500" },
@@ -27,7 +27,7 @@ interface CreateLibraryModalProps {
 export function CreateLibraryModal({ isOpen, onClose }: CreateLibraryModalProps) {
     const { t, dir } = useI18n();
     const [name, setName] = useState("");
-    const [selectedIcon, setSelectedIcon] = useState("📁");
+    const [selectedIcon, setSelectedIcon] = useState<string>(UI_DEFAULTS.LIBRARY.ICON);
     const [selectedColor, setSelectedColor] = useState("text-slate-500");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export function CreateLibraryModal({ isOpen, onClose }: CreateLibraryModalProps)
                 router.refresh();
                 onClose();
                 setName("");
-                setSelectedIcon("📁");
+                setSelectedIcon(UI_DEFAULTS.LIBRARY.ICON);
                 setSelectedColor("text-slate-500");
             }
         } catch {
@@ -102,7 +102,7 @@ export function CreateLibraryModal({ isOpen, onClose }: CreateLibraryModalProps)
                     <div>
                         <label className="text-sm text-slate-400 mb-2 block">{t.createLibrary.iconLabel}</label>
                         <div className="flex flex-wrap gap-2">
-                            {ICON_OPTIONS.map((icon) => (
+                            {UI_DEFAULTS.LIBRARY.ICONS.map((icon) => (
                                 <button
                                     key={icon}
                                     type="button"

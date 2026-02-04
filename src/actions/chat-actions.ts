@@ -1,6 +1,5 @@
 "use server";
 
-import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
@@ -8,11 +7,12 @@ import { GoogleAIService } from "@/lib/google-ai";
 import { logChatRequest, logChatResponse, logDebug } from "@/lib/logger";
 import { withAuth } from "@/lib/auth-middleware";
 import Message from "@/models/Message";
+import { CHAT_CONSTANTS, MESSAGES, LOG_MESSAGES, CHAT_SCOPES, CHAT_ROLES, CHAT_MODES, ChatScopeType, ChatRoleType, ChatModeType } from "@/config/constants";
 import { revalidatePath } from "next/cache";
 
 export type ChatMessage = {
     id?: string;
-    role: "user" | "assistant";
+    role: ChatRoleType;
     content: string;
     citations?: { id: number; uri?: string; title?: string }[];
     createdAt?: string;
@@ -21,13 +21,11 @@ export type ChatMessage = {
 export const sendMessageAction = withAuth(async (
     user,
     contextId: string,
-    scope: "file" | "library" | "global",
+    scope: ChatScopeType,
     history: ChatMessage[],
     newMessage: string,
-    mode?: "limited" | "auxiliary"
+    mode?: ChatModeType
 ): Promise<{ reply: string; citations?: any[]; error?: string }> => {
-    await connectToDatabase();
-
     try {
         // User already authenticated, get populated store
         const userWithStore = await User.findById(user._id).populate("primaryStoreId");
@@ -35,31 +33,29 @@ export const sendMessageAction = withAuth(async (
         if (!userWithStore || !userWithStore.primaryStoreId) {
             return {
                 reply: "",
-                error: "No document store found. Please upload a document first.",
+                error: MESSAGES.ERRORS.NO_STORE,
             };
         }
 
-        // Access the populated Store document
-        // @ts-ignore
-        const googleStoreId = userWithStore.primaryStoreId.googleStoreId;
+        const googleStoreId = (userWithStore.primaryStoreId as any)?.googleStoreId;
 
         if (!googleStoreId) {
             return {
                 reply: "",
-                error: "Store record is invalid (missing Google ID).",
+                error: MESSAGES.ERRORS.INVALID_STORE,
             };
         }
 
         // 2. Determine Chat Mode & Instruction
-        const defaultMode = (user.settings?.defaultMode || "limited") as "limited" | "auxiliary";
+        const defaultMode = (user.settings?.defaultMode || CHAT_MODES.LIMITED) as ChatModeType;
         const requestedMode = mode || defaultMode;
 
         // Define default instructions as fallback
-        const DEFAULT_LIMITED = "Answer ONLY using the provided context. Do not use outside knowledge. If the answer is not found, say so.";
-        const DEFAULT_AUXILIARY = "Use the provided context as a primary source, but feel free to expand with your general knowledge to provide a helpful answer.";
+        const DEFAULT_LIMITED = CHAT_CONSTANTS.MODES.LIMITED.DEFAULT_INSTRUCTION;
+        const DEFAULT_AUXILIARY = CHAT_CONSTANTS.MODES.AUXILIARY.DEFAULT_INSTRUCTION;
 
         let systemInstruction: string;
-        if (requestedMode === "limited") {
+        if (requestedMode === CHAT_MODES.LIMITED) {
             systemInstruction = user.settings?.chatModes?.limited?.instruction || DEFAULT_LIMITED;
         } else {
             systemInstruction = user.settings?.chatModes?.auxiliary?.instruction || DEFAULT_AUXILIARY;
@@ -76,14 +72,14 @@ export const sendMessageAction = withAuth(async (
 
         // 3. Save User Message
         const messageData: any = {
-            role: "user",
+            role: CHAT_ROLES.USER,
             content: newMessage,
             scope,
             mode: requestedMode,
             userId: user._id,
         };
-        if (scope === "file") messageData.fileId = contextId;
-        if (scope === "library") messageData.libraryId = contextId;
+        if (scope === CHAT_SCOPES.FILE) messageData.fileId = contextId;
+        if (scope === CHAT_SCOPES.LIBRARY) messageData.libraryId = contextId;
         // Global scope has no specific ID (or userId implicitly)
 
         await Message.create(messageData);
@@ -95,7 +91,7 @@ export const sendMessageAction = withAuth(async (
             { type: scope, id: contextId },
             systemInstruction
         );
-        const replyText = result.text || "I couldn't find relevant information in your documents.";
+        const replyText = result.text || MESSAGES.INFO.NO_RELEVANT_INFO;
 
         // Log chat response details
         logChatResponse({
@@ -160,28 +156,27 @@ export const sendMessageAction = withAuth(async (
                 }
             }
         } catch (citationError) {
-            console.warn("Failed to enrich citations:", citationError);
+            console.warn(LOG_MESSAGES.CHAT.ENRICH_CITATIONS_FAIL, citationError);
             // Fallback to original citations if mapping fails
         }
 
         // 5. Save Assistant Message with Citations
-        const assistantMessageData = { ...messageData, role: "assistant", content: replyText, citations: enrichedCitations };
+        const assistantMessageData = { ...messageData, role: CHAT_ROLES.ASSISTANT, content: replyText, citations: enrichedCitations };
         await Message.create(assistantMessageData);
 
         // Revalidate cache
-        if (scope === "file") revalidatePath(`/chat/${contextId}`);
+        if (scope === CHAT_SCOPES.FILE) revalidatePath(`/chat/${contextId}`);
         // TODO: Revalidate library/global paths when created
 
         return {
             reply: replyText,
-            // @ts-ignore
             citations: enrichedCitations
         };
     } catch (error) {
-        console.error("Chat Action Failed:", error);
+        console.error(LOG_MESSAGES.CHAT.ACTION_FAIL, error);
         return {
             reply: "",
-            error: error instanceof Error ? error.message : "Failed to process your question. Please try again.",
+            error: error instanceof Error ? error.message : MESSAGES.ERRORS.GENERIC_ERROR,
         };
     }
 });
@@ -191,24 +186,23 @@ export const sendMessageAction = withAuth(async (
 export const getChatHistoryAction = withAuth(async (
     user,
     contextId: string,
-    scope: "file" | "library" | "global",
+    scope: ChatScopeType,
     before?: string, // ISO Date string
     limit: number = 50
 ): Promise<{ messages: ChatMessage[]; hasMore: boolean; error?: string }> => {
-    await connectToDatabase();
     try {
         const query: any = { scope };
 
         // Enforce Ownership Verification
-        if (scope === "file") {
+        if (scope === CHAT_SCOPES.FILE) {
             const file = await FileModel.findOne({ _id: contextId, userId: user._id }).select("_id");
-            if (!file) return { messages: [], hasMore: false, error: "Access denied" };
+            if (!file) return { messages: [], hasMore: false, error: MESSAGES.ERRORS.ACCESS_DENIED };
             query.fileId = contextId;
-        } else if (scope === "library") {
+        } else if (scope === CHAT_SCOPES.LIBRARY) {
             const lib = await Library.findOne({ _id: contextId, userId: user._id }).select("_id");
-            if (!lib) return { messages: [], hasMore: false, error: "Access denied" };
+            if (!lib) return { messages: [], hasMore: false, error: MESSAGES.ERRORS.ACCESS_DENIED };
             query.libraryId = contextId;
-        } else if (scope === "global") {
+        } else if (scope === CHAT_SCOPES.GLOBAL) {
             // Enforce User Isolation for Global Chat
             query.userId = user._id;
         }
@@ -229,7 +223,7 @@ export const getChatHistoryAction = withAuth(async (
         return {
             messages: resultMessages.reverse().map((m: any) => ({
                 id: m._id.toString(),
-                role: m.role as "user" | "assistant",
+                role: m.role as ChatRoleType,
                 content: m.content,
                 citations: m.citations?.map((c: any) => ({
                     id: c.id,
@@ -241,7 +235,7 @@ export const getChatHistoryAction = withAuth(async (
             hasMore,
         };
     } catch (error) {
-        console.error("Get History Failed:", error);
+        console.error(LOG_MESSAGES.CHAT.GET_HISTORY_FAIL, error);
         return { messages: [], hasMore: false };
     }
 });
@@ -253,23 +247,22 @@ export type DeleteHistoryOptions =
 export const deleteChatHistoryAction = withAuth(async (
     user,
     contextId: string,
-    scope: "file" | "library" | "global",
+    scope: ChatScopeType,
     options: DeleteHistoryOptions
 ): Promise<{ success: boolean; error?: string }> => {
-    await connectToDatabase();
     try {
         const query: any = { scope };
 
         // Enforce Ownership Verification
-        if (scope === "file") {
+        if (scope === CHAT_SCOPES.FILE) {
             const file = await FileModel.findOne({ _id: contextId, userId: user._id }).select("_id");
-            if (!file) return { success: false, error: "Access denied" };
+            if (!file) return { success: false, error: MESSAGES.ERRORS.ACCESS_DENIED };
             query.fileId = contextId;
-        } else if (scope === "library") {
+        } else if (scope === CHAT_SCOPES.LIBRARY) {
             const lib = await Library.findOne({ _id: contextId, userId: user._id }).select("_id");
-            if (!lib) return { success: false, error: "Access denied" };
+            if (!lib) return { success: false, error: MESSAGES.ERRORS.ACCESS_DENIED };
             query.libraryId = contextId;
-        } else if (scope === "global") {
+        } else if (scope === CHAT_SCOPES.GLOBAL) {
             query.userId = user._id;
         }
 
@@ -283,12 +276,12 @@ export const deleteChatHistoryAction = withAuth(async (
         }
 
         await Message.deleteMany(query);
-        if (scope === "file") revalidatePath(`/chat/${contextId}`);
+        if (scope === CHAT_SCOPES.FILE) revalidatePath(`/chat/${contextId}`);
         // Can also revalidate /chat/global and /chat/library/[id] if paths known
 
         return { success: true };
     } catch (error) {
-        console.error("Delete History Failed:", error);
-        return { success: false, error: "Failed to delete history" };
+        console.error(LOG_MESSAGES.CHAT.DELETE_HISTORY_FAIL, error);
+        return { success: false, error: MESSAGES.ERRORS.DELETE_HISTORY_FAILED };
     }
 });

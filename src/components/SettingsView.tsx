@@ -15,7 +15,7 @@ interface SettingsViewProps {
     userStats: {
         name: string;
         email?: string;
-        image?: string;
+        image?: string | null;
         expires?: string;
         [key: string]: any;
     };
@@ -86,7 +86,6 @@ export function SettingsView({ userStats }: SettingsViewProps) {
                         </div>
                         <div className="flex items-center gap-4 mb-4">
                             {/* Avatar Display */}
-                            {/* @ts-ignore */}
                             {userStats.image ? (
                                 <img src={userStats.image} alt={userStats.name} className="h-16 w-16 rounded-full border border-slate-700" />
                             ) : (
@@ -101,7 +100,6 @@ export function SettingsView({ userStats }: SettingsViewProps) {
 
                         <div>
                             <label className="text-sm text-muted-foreground">{t.settings.email}</label>
-                            { /* @ts-ignore */}
                             <Input defaultValue={userStats.email || "Unknown"} className="mt-1 bg-slate-800" disabled />
                         </div>
                         {userStats.expires && (

@@ -64,7 +64,6 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
         if (!hasMore || messages.length === 0) return;
 
         const oldestMessage = messages[0];
-        // @ts-ignore
         const before = oldestMessage.createdAt;
 
         const histRes = await getChatHistoryAction(libraryId, "library", before);

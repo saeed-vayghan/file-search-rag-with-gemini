@@ -247,7 +247,6 @@ export class GoogleAIService {
             return {
                 name: store.name,
                 displayName: store.displayName,
-                // @ts-ignore - API field mismatch fix
                 fileCount: Number((store as any).activeDocumentsCount) || (store as any).fileCount || 0,
                 // SDK might not expose sizeBytes directly yet, we'll estimate or wait for API update
                 // For now, we return what it gives us
