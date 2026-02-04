@@ -2,11 +2,11 @@
 
 import User from "@/models/User";
 import { revalidatePath } from "next/cache";
-import { withAuth, withOptionalAuth } from "@/lib/auth-middleware";
+import { withAuth, withOptionalAuth } from "@/lib/auth";
 import { MESSAGES, PATHS, LOG_MESSAGES } from "@/config/constants";
-import { normalizeChatModeSettings, ChatModeSettings } from "@/lib/user-logic";
+import { normalizeChatModeSettings, ChatModeSettings } from "@/lib/chat";
 
-export type { ChatModeSettings } from "@/lib/user-logic";
+export type { ChatModeSettings } from "@/lib/chat";
 
 export const getChatModeSettings = withOptionalAuth(async (user): Promise<ChatModeSettings | null> => {
     try {

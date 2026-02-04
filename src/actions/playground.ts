@@ -2,7 +2,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import vm from "vm";
-import { withAuth } from "@/lib/auth-middleware";
+import { withAuth } from "@/lib/auth";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
 
 if (!process.env.GOOGLE_API_KEY) {

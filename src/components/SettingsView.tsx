@@ -10,6 +10,8 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { updateUserAction } from "@/actions/user-actions";
+import { signOut } from "next-auth/react";
 
 interface SettingsViewProps {
     userStats: {
@@ -29,7 +31,6 @@ export function SettingsView({ userStats }: SettingsViewProps) {
 
     const handleSave = () => {
         startTransition(async () => {
-            const { updateUserAction } = await import("@/actions/user-actions");
             const result = await updateUserAction({ name });
             if ("error" in result) {
                 // You might want to add a toast notification here
@@ -125,7 +126,6 @@ export function SettingsView({ userStats }: SettingsViewProps) {
                                 size="sm"
                                 variant="destructive"
                                 onClick={async () => {
-                                    const { signOut } = await import("next-auth/react");
                                     signOut({ callbackUrl: "/auth/signin" });
                                 }}
                             >

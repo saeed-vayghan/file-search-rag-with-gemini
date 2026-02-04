@@ -5,17 +5,19 @@ import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
 import Store from "@/models/Store";
-import * as GoogleAIService from "@/lib/google-ai";
+import * as GoogleAIService from "@/lib/google";
 import { logInfo, logDangerousOperation, logDebug } from "@/lib/logger";
-import { withAuth } from "@/lib/auth-middleware";
+import { withAuth } from "@/lib/auth";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { rm } from "fs/promises";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
 import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
-import { validateFileSize, validateStoreCapacity, mapFileToUi, generateLocalFilePath } from "@/lib/file-logic";
+import { validateFileSize, validateStoreCapacity, mapFileToUi, generateLocalFilePath, mapStoreStatsToUi, classifyGoogleError, GOOGLE_ERROR_TYPES } from "@/lib/file";
 import Message from "@/models/Message";
 import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
+import { formatBytes } from "@/lib/utils";
 
 
 export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
@@ -44,7 +46,6 @@ export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?
         return { exists: false };
     }
 });
-
 
 /**
  * Helper: Ensures the user has a valid Store record.
@@ -121,9 +122,9 @@ async function importFileWithRetry(
         );
         return { operationName: opName };
     } catch (error: any) {
-        // Check if Store is missing/expired (403/404)
-        const status = error.status || error.code || error?.error?.code;
-        if (status !== 403 && status !== 404) {
+        // Check if Store is missing/expired
+        const errorType = classifyGoogleError(error);
+        if (errorType !== GOOGLE_ERROR_TYPES.STORE_EXPIRED && errorType !== GOOGLE_ERROR_TYPES.STORE_NOT_FOUND) {
             throw error; // Not a recoverable error
         }
 
@@ -266,7 +267,6 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     }
 }, { rateLimit: RATE_LIMIT_CONFIG.UPLOAD });
 
-
 export const getFilesAction = withAuth(async (user) => {
     const files = await FileModel.find({ userId: user._id })
         .sort({ createdAt: -1 })
@@ -322,7 +322,6 @@ export const getUserStatsAction = withAuth(async (user) => {
     };
 });
 
-
 export const getLibrariesAction = withAuth(async (user) => {
     // Get real libraries from DB
     const libraries = await Library.find({ userId: user._id }).lean();
@@ -375,7 +374,6 @@ export const createLibraryAction = withAuth(async (user, name: string, icon?: st
     }
 }, { rateLimit: { limit: 10, windowMs: 10 * 60 * 1000, actionName: "library" } });
 
-
 export const updateLibraryAction = withAuth(async (user, libraryId: string, name: string, icon?: string, color?: string) => {
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
@@ -407,7 +405,6 @@ export const updateLibraryAction = withAuth(async (user, libraryId: string, name
         return { error: MESSAGES.ERRORS.UPDATE_LIB_FAILED };
     }
 }, { rateLimit: { limit: 10, windowMs: 10 * 60 * 1000, actionName: "library" } });
-
 
 export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
 
@@ -473,10 +470,6 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
     }
 });
 
-import { formatBytes } from "@/lib/utils";
-
-
-
 export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
 
     try {
@@ -516,7 +509,6 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
         return { error: MESSAGES.ERRORS.CHECK_STATUS_FAILED };
     }
 });
-
 
 // Internal helper for usage within other server actions (avoids Auth middleware recursion issues)
 // Assumes caller has already verified User
@@ -617,6 +609,7 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
         return { error: MESSAGES.ERRORS.INSPECT_REMOTE_FAILED };
     }
 });
+
 export const getLibraryFilesAction = withAuth(async (user, libraryId: string) => {
 
     try {
@@ -663,23 +656,11 @@ export const getStoreStatusAction = withAuth(async (user, force: boolean = false
         }
 
         const userTier = (user.tier || DEFAULT_TIER) as TierKey;
-        const limits = TIERS[userTier];
-
         const localFileCount = await FileModel.countDocuments({ userId: user._id });
 
         return {
             success: true,
-            store: {
-                id: store._id.toString(),
-                displayName: store.displayName,
-                googleStoreId: store.googleStoreId,
-                sizeBytes: store.sizeBytes,
-                fileCount: store.fileCount, // Cloud Count
-                localFileCount: localFileCount, // Local DB Count
-                limitBytes: limits.maxStoreSizeBytes,
-                tier: limits.name,
-                lastSyncedAt: store.lastSyncedAt,
-            }
+            store: mapStoreStatsToUi(store, localFileCount, userTier)
         };
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.GET_STORE_STATUS_FAIL, error);
@@ -706,7 +687,6 @@ export const purgeUserDataAction = withAuth(async (user) => {
 
         // 2. Delete Local Directory
         try {
-            const { rm } = await import("fs/promises");
             const userUploadDir = join(process.cwd(), "uploads", user._id.toString());
             await rm(userUploadDir, { recursive: true, force: true });
             logInfo("PURGE", `Deleted local directory: ${userUploadDir}`);

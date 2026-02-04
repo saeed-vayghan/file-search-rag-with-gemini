@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { uploadFileAction, getLibrariesAction } from "@/actions/file-actions";
+import { cn, calculateSHA256 } from "@/lib/utils";
+import { uploadFileAction, getLibrariesAction, checkFileDuplicate } from "@/actions/file-actions";
 import { Upload, Loader2, CheckCircle, XCircle, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
@@ -70,11 +70,9 @@ export function FileUploadForm() {
 
         try {
             // 1. Calculate Hash
-            const { calculateSHA256 } = await import("@/lib/hash-utils"); // Dynamic import
             const hash = await calculateSHA256(file);
 
             // 2. Check for Duplicates (Client-side Check)
-            const { checkFileDuplicate } = await import("@/actions/file-actions");
             const duplicate = await checkFileDuplicate(hash, selectedLibrary);
 
             if ('error' in duplicate) {

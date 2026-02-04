@@ -1,8 +1,44 @@
 import connectToDatabase from "@/lib/db";
-import { getAuthenticatedUser } from "./auth-helpers";
 import type { IUser } from "@/models/User";
 import { PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
-import { checkRateLimit } from "./ratelimit";
+import { checkRateLimit } from "../ratelimit";
+import { auth } from "./auth";
+import User from "@/models/User";
+
+
+/**
+ * Get the authenticated user from the current session.
+ * Returns null if not authenticated.
+ * Use this in server actions to ensure user is logged in.
+ */
+export async function getAuthenticatedUser(): Promise<IUser | null> {
+    const session = await auth();
+
+    if (!session?.user?.email) {
+        return null;
+    }
+
+    await connectToDatabase();
+
+    const user = await User.findOne({ email: session.user.email })
+        .populate("primaryStoreId");
+
+    return user as IUser | null;
+}
+
+/**
+ * Require authentication. Throws error if user is not authenticated.
+ * Returns the authenticated user.
+ */
+export async function requireAuth(): Promise<IUser> {
+    const user = await getAuthenticatedUser();
+
+    if (!user) {
+        throw new Error(MESSAGES.ERRORS.UNAUTHORIZED);
+    }
+
+    return user;
+}
 
 export type RateLimitOptions = {
     limit: number;

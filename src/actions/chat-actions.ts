@@ -3,13 +3,13 @@
 import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
-import * as GoogleAIService from "@/lib/google-ai";
-import { logChatRequest, logChatResponse, logDebug } from "@/lib/logger";
-import { withAuth } from "@/lib/auth-middleware";
+import * as GoogleAIService from "@/lib/google";
+import { logChatRequest, logChatResponse } from "@/lib/logger";
+import { withAuth } from "@/lib/auth";
 import Message from "@/models/Message";
 import { MESSAGES, LOG_MESSAGES, CHAT_SCOPES, CHAT_ROLES, CHAT_MODES, ChatScopeType, ChatRoleType, ChatModeType } from "@/config/constants";
 import { revalidatePath } from "next/cache";
-import { resolveSystemInstruction, extractGoogleFileIdsFromCitations, enrichCitationsWithFileNames, mapMessageToUi } from "@/lib/chat-logic";
+import { resolveSystemInstruction, extractGoogleFileIdsFromCitations, enrichCitationsWithFileNames, mapMessageToUi } from "@/lib/chat";
 import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
 
 export type ChatMessage = {
@@ -136,7 +136,6 @@ export const sendMessageAction = withAuth(async (
         };
     }
 }, { rateLimit: RATE_LIMIT_CONFIG.CHAT });
-
 
 
 export const getChatHistoryAction = withAuth(async (

@@ -2,7 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { stat } from "fs/promises";
 import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo, logWarn } from "@/lib/logger";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
-import { translateGoogleError, constructRAGFilter, parseGroundingCitations } from "@/lib/chat-logic";
+import { translateGoogleError, constructRAGFilter, parseGroundingCitations } from "@/lib/chat";
+import { findMatchingDocument } from "@/lib/file";
 
 if (!process.env.GOOGLE_API_KEY) {
     throw new Error(MESSAGES.ERRORS.GOOGLE_API_KEY_MISSING);
@@ -11,6 +12,7 @@ if (!process.env.GOOGLE_API_KEY) {
 let globalAiClient: GoogleGenAI | null = null;
 
 const MODEL_NAME = "gemini-3-flash-preview"; // Must match PoC - supports File Search tool
+
 
 export function getAIClient(): GoogleGenAI {
     if (!globalAiClient) {
@@ -21,7 +23,6 @@ export function getAIClient(): GoogleGenAI {
     }
     return globalAiClient;
 }
-
 
 /**
  * 1. Uploads a raw file to Google's staging area.
@@ -210,22 +211,25 @@ export async function deleteDocumentFromStore(
         // So we pass the storeName as the parent.
         const response = await aiClient.fileSearchStores.documents.list({
             parent: storeName
-        } as any); // Cast to any because the SDK types might be experimental/incomplete for this specific alpha method.
+        } as any);
 
+        // Collect documents from async iterator
+        const docs = [];
         for await (const doc of response) {
-            // Strategy 1: Check if the doc name contains the cleanId
-            // Strategy 2: Check if 'displayName' matches the cleanId
-            if (doc.displayName === cleanId || doc.name?.includes(cleanId)) {
-                logInfo("GoogleAI", `Found matching document: ${doc.name}. Deleting with force=true...`);
-                await aiClient.fileSearchStores.documents.delete({
-                    name: doc.name as string,
-                    config: {
-                        force: true
-                    }
-                } as any);
-                logInfo("GoogleAI", "Document deleted.");
-                return true;
-            }
+            docs.push(doc);
+        }
+
+        const matchingName = findMatchingDocument(docs, googleFileId);
+        if (matchingName) {
+            logInfo("GoogleAI", `Found matching document: ${matchingName}. Deleting with force=true...`);
+            await aiClient.fileSearchStores.documents.delete({
+                name: matchingName,
+                config: {
+                    force: true
+                }
+            } as any);
+            logInfo("GoogleAI", "Document deleted.");
+            return true;
         }
 
         logInfo("GoogleAI", `No matching document found in store for ${googleFileId}.`);

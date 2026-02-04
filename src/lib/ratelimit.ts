@@ -1,12 +1,59 @@
 import RateLimit from "@/models/RateLimit";
 import connectToDatabase from "./db";
 
+
+export interface RateLimitRecord {
+    hits: number;
+    resetAt: Date;
+}
+
 export type RateLimitResult = {
     allowed: boolean;
     hits: number;
     remaining: number;
     resetAt: Date;
 };
+
+/**
+ * Calculates the next state of a rate limit record based on current time.
+ */
+export function calculateNextRecord(
+    current: RateLimitRecord | null,
+    now: Date,
+    windowMs: number
+): RateLimitRecord {
+    if (!current || now > current.resetAt) {
+        // Create or reset window
+        return {
+            hits: 1,
+            resetAt: new Date(now.getTime() + windowMs),
+        };
+    }
+
+    // Increment within existing window
+    return {
+        ...current,
+        hits: current.hits + 1,
+    };
+}
+
+/**
+ * Evaluates if a request is allowed based on a record and limit.
+ */
+export function evaluateRateLimit(
+    record: RateLimitRecord,
+    limit: number
+) {
+    const allowed = record.hits <= limit;
+    const remaining = Math.max(0, limit - record.hits);
+
+    return {
+        allowed,
+        hits: record.hits,
+        remaining,
+        resetAt: record.resetAt,
+    };
+}
 
 /**
  * Checks and increments the rate limit for a given key.
@@ -25,36 +72,26 @@ export async function checkRateLimit(
 
     const now = new Date();
 
-    // Atomically find and update or create
-    let record = await RateLimit.findOne({ key });
+    // 1. Fetch current state (Potential Side Effect)
+    const existing = await RateLimit.findOne({ key });
 
-    if (!record || now > record.resetAt) {
-        // Create new window
-        const resetAt = new Date(now.getTime() + windowMs);
-        record = await RateLimit.findOneAndUpdate(
-            { key },
-            {
-                $set: { hits: 1, resetAt },
-            },
-            { upsert: true, new: true }
-        );
-    } else {
-        // Increment within window
-        record = await RateLimit.findOneAndUpdate(
-            { key },
-            { $inc: { hits: 1 } },
-            { new: true }
-        );
-    }
+    // 2. Calculate next state (Pure Logic)
+    const nextRecord = calculateNextRecord(
+        existing ? { hits: existing.hits, resetAt: existing.resetAt } : null,
+        now,
+        windowMs
+    );
 
-    const hits = record.hits;
-    const allowed = hits <= limit;
-    const remaining = Math.max(0, limit - hits);
+    // 3. Persist next state (Side Effect)
+    const updated = await RateLimit.findOneAndUpdate(
+        { key },
+        { $set: nextRecord },
+        { upsert: true, new: true }
+    );
 
-    return {
-        allowed,
-        hits,
-        remaining,
-        resetAt: record.resetAt,
-    };
+    // 4. Evaluate and return (Pure Logic)
+    return evaluateRateLimit({
+        hits: updated.hits,
+        resetAt: updated.resetAt
+    }, limit);
 }

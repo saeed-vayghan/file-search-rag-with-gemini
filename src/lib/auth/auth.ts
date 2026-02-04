@@ -1,9 +1,9 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import connectToDatabase from "./db";
+import connectToDatabase from "../db";
 import User from "@/models/User";
 import Store from "@/models/Store";
-import * as GoogleAIService from "./google-ai";
+import * as GoogleAIService from "../google";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
 
 if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {

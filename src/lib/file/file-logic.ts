@@ -1,5 +1,6 @@
-import { TierConfig } from "@/config/limits";
+import { TierConfig, TIERS } from "@/config/limits";
 import { UI_DEFAULTS } from "@/config/constants";
+import { formatBytes } from "../utils";
 import { join } from "path";
 
 /**
@@ -43,13 +44,62 @@ export function mapFileToUi(f: any) {
         mimeType: f.mimeType,
         type: f.mimeType.split("/")[1]?.toUpperCase() || "DOC",
         sizeBytes: f.sizeBytes,
-        size: (f.sizeBytes / 1024).toFixed(1) + " KB",
+        size: formatBytes(f.sizeBytes),
         status: f.status,
         date: f.createdAt ? new Date(f.createdAt).toISOString().split("T")[0] : "",
         libraryName: f.libraryId?.name || "Uncategorized",
         libraryIcon: f.libraryId?.icon || UI_DEFAULTS.LIBRARY.ICON,
         libraryId: f.libraryId?._id?.toString() || f.libraryId?.toString(),
     };
+}
+
+/**
+ * Pure function to map DB store and user data to a unified status object.
+ */
+export function mapStoreStatsToUi(store: any, localFileCount: number, userTier: string) {
+    const limits = TIERS[userTier as keyof typeof TIERS] || TIERS.TIER_1;
+
+    return {
+        id: store._id.toString(),
+        displayName: store.displayName,
+        googleStoreId: store.googleStoreId,
+        sizeBytes: store.sizeBytes,
+        fileCount: store.fileCount, // Cloud Count (synced)
+        localFileCount: localFileCount, // Local DB Count
+        limitBytes: limits.maxStoreSizeBytes,
+        tier: limits.name,
+        lastSyncedAt: store.lastSyncedAt,
+    };
+}
+
+/**
+ * Pure logic to find a matching document name in a list by Google File ID.
+ */
+export function findMatchingDocument(docs: any[], googleFileId: string): string | null {
+    const cleanId = googleFileId.replace("files/", "");
+    const match = docs.find(doc => doc.displayName === cleanId || doc.name?.includes(cleanId));
+    return match ? match.name : null;
+}
+
+/**
+ * Semantic Google AI Error Classifiers.
+ */
+export const GOOGLE_ERROR_TYPES = {
+    STORE_EXPIRED: "STORE_EXPIRED",
+    STORE_NOT_FOUND: "STORE_NOT_FOUND",
+    QUOTA_EXCEEDED: "QUOTA_EXCEEDED",
+    UNKNOWN: "UNKNOWN"
+} as const;
+
+export function classifyGoogleError(error: any): keyof typeof GOOGLE_ERROR_TYPES {
+    const status = error.status || error.code || error?.error?.code;
+    const message = error.message?.toLowerCase() || "";
+
+    if (status === 403) return GOOGLE_ERROR_TYPES.STORE_EXPIRED;
+    if (status === 404) return GOOGLE_ERROR_TYPES.STORE_NOT_FOUND;
+    if (message.includes("quota") || status === 429) return GOOGLE_ERROR_TYPES.QUOTA_EXCEEDED;
+
+    return GOOGLE_ERROR_TYPES.UNKNOWN;
 }
 
 /**
