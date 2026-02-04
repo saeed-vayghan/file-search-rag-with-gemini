@@ -96,7 +96,6 @@ export default function GlobalChatPage() {
         router.push(`/chat/library/${scope}`);
     };
 
-    // ... handle submit ... (unchanged logic below, just need to preserve it if not replaced)
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;

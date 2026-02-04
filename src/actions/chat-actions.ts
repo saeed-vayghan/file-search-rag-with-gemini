@@ -27,8 +27,6 @@ export async function sendMessageAction(
     newMessage: string,
     mode?: "limited" | "auxiliary"
 ): Promise<{ reply: string; citations?: any[]; error?: string }> {
-    // ... implementation ...
-    // (I will use separate calls to avoid replacing entire file, focusing on chunks)
     await connectToDatabase();
 
     try {
@@ -84,7 +82,6 @@ export async function sendMessageAction(
             scope,
             mode: requestedMode // Save mode to message for auditing/history if needed (future schema update)
         };
-        // ... scope mapping ...
         if (scope === "file") messageData.fileId = contextId;
         if (scope === "library") messageData.libraryId = contextId;
         // Global scope has no specific ID (or userId implicitly)
