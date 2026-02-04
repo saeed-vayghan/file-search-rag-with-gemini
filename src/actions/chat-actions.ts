@@ -4,6 +4,7 @@ import connectToDatabase from "@/lib/db";
 import User from "@/models/User";
 import FileModel from "@/models/File";
 import { GoogleAIService } from "@/lib/google-ai";
+import { logChatRequest, logChatResponse, logDebug } from "@/lib/logger";
 
 import Message from "@/models/Message";
 import { revalidatePath } from "next/cache";
@@ -68,13 +69,13 @@ export async function sendMessageAction(
         }
 
         // Log chat request details
-        console.log("\n=== CHAT REQUEST ===");
-        console.log(`Scope: ${scope}`);
-        console.log(`Context ID: ${contextId}`);
-        console.log(`Chat Mode: ${requestedMode.toUpperCase()}`);
-        console.log(`User Message: "${newMessage}"`);
-        console.log(`System Instruction: ${systemInstruction}`);
-        console.log("==================\n");
+        logChatRequest({
+            scope,
+            contextId,
+            chatMode: requestedMode,
+            userMessage: newMessage,
+            systemInstruction,
+        });
 
         // 3. Save User Message
         const messageData: any = {
@@ -100,11 +101,12 @@ export async function sendMessageAction(
         const replyText = result.text || "I couldn't find relevant information in your documents.";
 
         // Log chat response details
-        console.log("\n=== CHAT RESPONSE ===");
-        console.log(`Mode Used: ${requestedMode.toUpperCase()}`);
-        console.log(`Reply Length: ${replyText.length} chars`);
-        console.log(`Citations Count: ${result.citations?.length || 0}`);
-        console.log(`Reply Preview: "${replyText.substring(0, 100)}${replyText.length > 100 ? '...' : ''}"`); console.log("===================\n");
+        logChatResponse({
+            chatMode: requestedMode,
+            replyLength: replyText.length,
+            citationsCount: result.citations?.length || 0,
+            replyPreview: replyText.substring(0, 100) + (replyText.length > 100 ? '...' : ''),
+        });
 
         // 4.5 Resolve Citations (Map Google File ID -> Display Name)
         let enrichedCitations = result.citations || [];
@@ -119,7 +121,7 @@ export async function sendMessageAction(
                     .map((c: any) => c.title)
                     .filter((t: string) => t && (t.startsWith("files/") || t.length > 20)); // Basic heuristic
 
-                console.log("[DEBUG] Extracted IDs:", googleFileIds);
+                logDebug("Chat", "Extracted IDs:", googleFileIds);
 
                 if (googleFileIds.length > 0) {
                     // 2. Find matching files in DB
@@ -132,7 +134,7 @@ export async function sendMessageAction(
                         ]
                     }).select("googleFileId displayName localPath").lean();
 
-                    console.log("[DEBUG] Found Files:", files.map(f => `${f.googleFileId} -> ${f.displayName}`));
+                    logDebug("Chat", "Found Files:", files.map(f => `${f.googleFileId} -> ${f.displayName}`));
 
                     // 3. Create a Map
                     const fileMap = new Map();
@@ -157,7 +159,7 @@ export async function sendMessageAction(
                             title
                         };
                     });
-                    console.log("[DEBUG] Enriched Citations:", JSON.stringify(enrichedCitations, null, 2));
+                    logDebug("Chat", "Enriched Citations:", JSON.stringify(enrichedCitations, null, 2));
                 }
             }
         } catch (citationError) {

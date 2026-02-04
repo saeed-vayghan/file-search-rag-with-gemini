@@ -1,4 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
+import { stat } from "fs/promises";
+import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo, logWarn } from "@/lib/logger";
 
 if (!process.env.GOOGLE_API_KEY) {
     throw new Error("GOOGLE_API_KEY is not defined");
@@ -13,13 +15,13 @@ export class GoogleAIService {
      * 1. Uploads a raw file to Google's staging area.
      */
     static async uploadFile(filePath: string, displayName: string, mimeType: string) {
-        console.log(`[GoogleAI] Uploading: ${displayName} (${mimeType}) from ${filePath}`);
+        logFileOperation({ operation: "upload", fileName: displayName, additionalInfo: `Type: ${mimeType}, Path: ${filePath}` });
 
         try {
             // Verify file exists locally before sending
             const { stat } = await import("fs/promises");
             const stats = await stat(filePath);
-            console.log(`[GoogleAI] Local file verified. Size: ${stats.size} bytes`);
+            logInfo("GoogleAI", `Local file verified. Size: ${stats.size} bytes`);
 
             // Note: The SDK's files.upload expects a path string in Node.js environment
             const uploadResponse = await ai.files.upload({
@@ -29,7 +31,7 @@ export class GoogleAIService {
                     mimeType
                 }
             });
-            console.log(`[GoogleAI] Upload success. URI: ${uploadResponse.uri}`);
+            logInfo("GoogleAI", `Upload success. URI: ${uploadResponse.uri}`);
             return {
                 name: uploadResponse.name!, // "files/..."
                 uri: uploadResponse.uri!,
@@ -44,7 +46,7 @@ export class GoogleAIService {
      * 2. Creates a user-specific Vector Store if one doesn't exist.
      */
     static async createStore(displayName: string) {
-        console.log(`[GoogleAI] Creating Store: ${displayName}`);
+        logStoreOperation({ operation: "create", storeName: displayName });
         try {
             const store = await ai.fileSearchStores.create({
                 config: { displayName }
@@ -65,7 +67,7 @@ export class GoogleAIService {
      * Returns the Operation Name for polling.
      */
     static async importFileToStore(storeName: string, googleFileId: string, metadata: { libraryId: string, dbFileId: string }) {
-        console.log(`[GoogleAI] Importing ${googleFileId} into ${storeName} (Lib: ${metadata.libraryId}, File: ${metadata.dbFileId})`);
+        logInfo("GoogleAI", `Importing ${googleFileId} into ${storeName} (Lib: ${metadata.libraryId}, File: ${metadata.dbFileId})`);
         try {
             // Custom Metadata must be strictly typed as stringValue
             const customMetadata = [
@@ -139,8 +141,6 @@ export class GoogleAIService {
             const candidate = response.candidates?.[0];
             const groundingMetadata = candidate?.groundingMetadata;
 
-            console.log("[DEBUG] GoogleAI Raw Metadata:", JSON.stringify(groundingMetadata, null, 2));
-
             const citations = groundingMetadata?.groundingChunks?.map((chunk: any, index: number) => ({
                 id: index,
                 uri: chunk.web?.uri || chunk.retrievedContext?.uri,
@@ -168,7 +168,7 @@ export class GoogleAIService {
      * 6. Deletes a file from Google's File API.
      */
     static async deleteFile(fileName: string) {
-        console.log(`[GoogleAI] Deleting: ${fileName}`);
+        logFileOperation({ operation: "delete", fileName });
         try {
             await ai.files.delete({ name: fileName });
             return true;
@@ -180,7 +180,7 @@ export class GoogleAIService {
             if (status !== 404 && status !== 403) {
                 throw error;
             }
-            console.log(`[GoogleAI] File ${fileName} not found on remote (Status ${status}), assuming deleted.`);
+            logInfo("GoogleAI", `File ${fileName} not found on remote (Status ${status}), assuming deleted.`);
             return false;
         }
     }
@@ -190,7 +190,7 @@ export class GoogleAIService {
      * Since we might not have the Document ID, we list docs to find the one matching our file.
      */
     static async deleteDocumentFromStore(storeName: string, googleFileId: string) {
-        console.log(`[GoogleAI] Attempting to remove file ${googleFileId} from store ${storeName}`);
+        logInfo("GoogleAI", `Attempting to remove file ${googleFileId} from store ${storeName}`);
         try {
             // clean ID: "files/abc" -> "abc"
             const cleanId = googleFileId.replace("files/", "");
@@ -207,19 +207,19 @@ export class GoogleAIService {
                 // Strategy 1: Check if the doc name contains the cleanId
                 // Strategy 2: Check if 'displayName' matches the cleanId
                 if (doc.displayName === cleanId || doc.name?.includes(cleanId)) {
-                    console.log(`[GoogleAI] Found matching document: ${doc.name}. Deleting with force=true...`);
+                    logInfo("GoogleAI", `Found matching document: ${doc.name}. Deleting with force=true...`);
                     await ai.fileSearchStores.documents.delete({
                         name: doc.name as string,
                         config: {
                             force: true
                         }
                     } as any);
-                    console.log(`[GoogleAI] Document deleted.`);
+                    logInfo("GoogleAI", "Document deleted.");
                     return true;
                 }
             }
 
-            console.log(`[GoogleAI] No matching document found in store for ${googleFileId}.`);
+            logInfo("GoogleAI", `No matching document found in store for ${googleFileId}.`);
 
         } catch (error) {
             console.warn("[GoogleAI] Failed to delete document from store (non-critical):", error);
@@ -228,7 +228,7 @@ export class GoogleAIService {
      * 7. Inspects a file's metadata from Google's File API.
      */
     static async getFile(fileName: string) {
-        console.log(`[GoogleAI] Inspecting: ${fileName}`);
+        logFileOperation({ operation: "inspect", fileName });
         try {
             const file = await ai.files.get({ name: fileName });
             return file;
@@ -241,7 +241,7 @@ export class GoogleAIService {
      * 8. Retrieves metadata for a Vector Store (e.g., size, file count).
      */
     static async getStoreMetadata(storeName: string) {
-        console.log(`[GoogleAI] Fetching Metadata for: ${storeName}`);
+        logStoreOperation({ operation: "fetch", storeName });
         try {
             const store = await ai.fileSearchStores.get({ name: storeName });
             return {
@@ -264,16 +264,16 @@ export class GoogleAIService {
      * This mimics the cleanup logic in poc/delete-all.js.
      */
     static async purgeAllUserGoogleData() {
-        console.log("🔥 [GoogleAI] Initiating GLOBAL PURGE...");
+        logDangerousOperation("GoogleAI", "Initiating GLOBAL PURGE...");
 
         // 1. Delete all Stores
         try {
-            console.log("   [GoogleAI] Deleting all stores...");
+            logInfo("GoogleAI", "Deleting all stores...");
             const stores = await ai.fileSearchStores.list();
             for await (const store of stores) {
                 try {
                     await ai.fileSearchStores.delete({ name: store.name as string, config: { force: true } });
-                    console.log(`   [GoogleAI] Deleted store: ${store.name}`);
+                    logInfo("GoogleAI", `Deleted store: ${store.name}`);
                 } catch (e) {
                     console.warn(`   [GoogleAI] Failed to delete store ${store.name} (ignoring):`, e);
                 }
@@ -284,12 +284,12 @@ export class GoogleAIService {
 
         // 2. Delete all Files
         try {
-            console.log("   [GoogleAI] Deleting all files...");
+            logInfo("GoogleAI", "Deleting all files...");
             const files = await ai.files.list();
             for await (const file of files) {
                 try {
                     await ai.files.delete({ name: file.name as string });
-                    console.log(`   [GoogleAI] Deleted file: ${file.name}`);
+                    logInfo("GoogleAI", `Deleted file: ${file.name}`);
                 } catch (e) {
                     console.warn(`   [GoogleAI] Failed to delete file ${file.name} (ignoring):`, e);
                 }
@@ -298,7 +298,7 @@ export class GoogleAIService {
             console.warn("   [GoogleAI] Error listing files for purge:", e);
         }
 
-        console.log("✅ [GoogleAI] Global Purge Complete.");
+        logDangerousOperation("GoogleAI", "Global Purge Complete.");
         return true;
     }
 }

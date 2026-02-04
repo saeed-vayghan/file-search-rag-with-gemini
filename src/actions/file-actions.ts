@@ -7,6 +7,7 @@ import FileModel from "@/models/File";
 import Library from "@/models/Library";
 import Store from "@/models/Store";
 import { GoogleAIService } from "@/lib/google-ai";
+import { logInfo, logDangerousOperation, logDebug } from "@/lib/logger";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -428,7 +429,7 @@ export async function deleteLibraryAction(libraryId: string) {
 
         // Cascade Delete Files
         const files = await FileModel.find({ libraryId: library._id });
-        console.log(`[Delete Library] Found ${files.length} files in library ${library.name} (${libraryId})`);
+        logDebug("DeleteLibrary", `Found ${files.length} files in library ${library.name} (${libraryId})`);
 
         let deletedCount = 0;
         let failedCount = 0;
@@ -436,7 +437,7 @@ export async function deleteLibraryAction(libraryId: string) {
         // Execute sequentially to avoid DB connection race conditions and rate limits
         for (const file of files) {
             try {
-                console.log(`[Delete Library] Deleting file: ${file._id}`);
+                logDebug("DeleteLibrary", `Deleting file: ${file._id}`);
                 const result = await deleteFileAction(file._id.toString());
                 if (result.success) {
                     deletedCount++;
@@ -450,7 +451,7 @@ export async function deleteLibraryAction(libraryId: string) {
             }
         }
 
-        console.log(`[Delete Library] Summary: ${deletedCount} deleted, ${failedCount} failed.`);
+        logInfo("DeleteLibrary", `Summary: ${deletedCount} deleted, ${failedCount} failed.`);
 
         if (failedCount > 0) {
             return { error: `Failed to delete ${failedCount} files. Library not deleted.` };
@@ -733,7 +734,7 @@ export async function purgeUserDataAction() {
     }
 
     try {
-        console.log(`🔥 [DANGER] Starting Purge for User: ${user.email}`);
+        logDangerousOperation("PURGE", `Starting Purge for User: ${user.email}`);
 
         // 1. Delete all DB Records
         await Message.deleteMany({}); // Purge all chat history
@@ -745,14 +746,14 @@ export async function purgeUserDataAction() {
         user.primaryStoreId = undefined;
         await user.save();
 
-        console.log("   [DB] Records purged.");
+        logInfo("PURGE", "DB Records purged.");
 
         // 2. Delete Local Directory
         try {
             const { rm } = await import("fs/promises");
             const userUploadDir = join(process.cwd(), "uploads", user._id.toString());
             await rm(userUploadDir, { recursive: true, force: true });
-            console.log(`   [FS] Deleted local directory: ${userUploadDir}`);
+            logInfo("PURGE", `Deleted local directory: ${userUploadDir}`);
         } catch (fsError) {
             console.warn("   [FS] Failed to delete local directory (might not exist):", fsError);
         }
