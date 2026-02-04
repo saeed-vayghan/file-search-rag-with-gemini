@@ -1,13 +1,25 @@
 import connectToDatabase from "@/lib/db";
 import { getAuthenticatedUser } from "./auth-helpers";
 import type { IUser } from "@/models/User";
-import { PATHS, LOG_MESSAGES } from "@/config/constants";
+import { PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
+import { checkRateLimit } from "./ratelimit";
+
+export type RateLimitOptions = {
+    limit: number;
+    windowMs: number;
+    actionName?: string;
+};
+
+export type ActionOptions = {
+    rateLimit?: RateLimitOptions;
+};
 
 /**
  * Higher-order function to wrap server actions with authentication.
  */
 export function withAuth<TArgs extends any[], TReturn>(
-    handler: (user: IUser, ...args: TArgs) => Promise<TReturn>
+    handler: (user: IUser, ...args: TArgs) => Promise<TReturn>,
+    options?: ActionOptions
 ) {
     return async (...args: TArgs): Promise<TReturn | { error: string }> => {
         try {
@@ -19,15 +31,19 @@ export function withAuth<TArgs extends any[], TReturn>(
                 redirect(PATHS.AUTH_SIGNIN);
             }
 
+            // Apply Rate Limiting if configured
+            if (options?.rateLimit) {
+                const key = `user:${user!._id}:${options.rateLimit.actionName || 'default'}`;
+                const rl = await checkRateLimit(key, options.rateLimit.limit, options.rateLimit.windowMs);
+
+                if (!rl.allowed) {
+                    return { error: MESSAGES.ERRORS.RATE_LIMIT_EXCEEDED || "Too many requests. Please try again later." };
+                }
+            }
+
             return await handler(user!, ...args);
         } catch (error) {
             console.error(LOG_MESSAGES.AUTH.ACTION_FAILED, error);
-            // Default error shape if possible, but TReturn might be strict.
-            // For now, we rely on the action's return type signature including { error: string }
-            // or we rethrow if it's a critical system error.
-            // Safest bet for now is to return a generic error object if the signature allows,
-            // or rethrow. Given the mixed return types, simple rethrow or specific handling is tricky.
-            // Let's stick to just connecting DB and Auth first to avoid breaking changes.
             throw error;
         }
     };
@@ -38,11 +54,24 @@ export function withAuth<TArgs extends any[], TReturn>(
  * Useful for actions that work differently for authenticated vs non-authenticated users.
  */
 export function withOptionalAuth<TArgs extends any[], TReturn>(
-    handler: (user: IUser | null, ...args: TArgs) => Promise<TReturn>
+    handler: (user: IUser | null, ...args: TArgs) => Promise<TReturn>,
+    options?: ActionOptions
 ) {
-    return async (...args: TArgs): Promise<TReturn> => {
+    return async (...args: TArgs): Promise<TReturn | { error: string }> => {
         await connectToDatabase();
         const user = await getAuthenticatedUser();
-        return handler(user, ...args);
+
+        // Apply Rate Limiting if configured (uses user ID or fallback to IP)
+        if (options?.rateLimit) {
+            const identifier = user ? user._id.toString() : "anonymous";
+            const key = `opt-user:${identifier}:${options.rateLimit.actionName || 'default'}`;
+            const rl = await checkRateLimit(key, options.rateLimit.limit, options.rateLimit.windowMs);
+
+            if (!rl.allowed) {
+                return { error: MESSAGES.ERRORS.RATE_LIMIT_EXCEEDED || "Too many requests. Please try again later." };
+            }
+        }
+
+        return handler(user, ...args) as Promise<TReturn>;
     };
 }

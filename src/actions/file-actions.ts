@@ -15,6 +15,7 @@ import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
 import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
 import { validateFileSize, validateStoreCapacity, mapFileToUi, generateLocalFilePath } from "@/lib/file-logic";
 import Message from "@/models/Message";
+import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
 
 
 export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
@@ -161,13 +162,13 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     let newFileId: string | null = null;
 
     try {
-        // 1. Resolve Dependencies (Concurrent generally safe here, but sequential for logic clarity)
+        // 1. Resolve Dependencies
         const userDoc = await User.findById(user._id);
         if (!userDoc) {
             return { error: MESSAGES.ERRORS.USER_NOT_FOUND };
         }
 
-        // 2. Validate Limits (Pure Logic)
+        // 2. Validate Limits
         const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
         const limits = TIERS[userTier];
 
@@ -176,7 +177,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
             return { error: sizeCheck.error };
         }
 
-        // 3. Prepare Environment (I/O)
+        // 3. Prepare Environment
         const libraryId = await resolveLibraryId(user, rawLibraryId);
         let store = await ensureUserStore(user);
 
@@ -191,7 +192,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         const tempPath = join(tmpdir(), `${Date.now()}-${file.name}`);
         await writeFile(tempPath, buffer);
 
-        // 5. Database Record Creation (Status: UPLOADING)
+        // 5. Database Record Creation
         const newFile = await FileModel.create({
             userId: user._id,
             libraryId,
@@ -214,7 +215,6 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
             user
         );
 
-        // If recovery happened, update our local store reference for stats update
         if (updatedStore) {
             store = updatedStore;
         }
@@ -254,10 +254,8 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.UPLOAD_FAIL, error);
 
-        // Cleanup Orphaned Record
         if (newFileId) {
             try {
-                console.warn(`${LOG_MESSAGES.FILE.CLEANUP_ORPHAN} ${newFileId}`);
                 await FileModel.findByIdAndDelete(newFileId);
             } catch (cleanupError) {
                 console.error(LOG_MESSAGES.FILE.CLEANUP_ORPHAN_FAIL, cleanupError);
@@ -266,7 +264,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
 
         return { error: MESSAGES.ERRORS.UPLOAD_FAILED };
     }
-});
+}, { rateLimit: RATE_LIMIT_CONFIG.UPLOAD });
 
 
 export const getFilesAction = withAuth(async (user) => {
@@ -351,7 +349,6 @@ export const getLibrariesAction = withAuth(async (user) => {
 });
 
 export const createLibraryAction = withAuth(async (user, name: string, icon?: string, color?: string) => {
-
     try {
         const library = await Library.create({
             userId: user._id,
@@ -376,11 +373,10 @@ export const createLibraryAction = withAuth(async (user, name: string, icon?: st
         console.error(LOG_MESSAGES.FILE.CREATE_LIB_FAIL, error);
         return { error: MESSAGES.ERRORS.CREATE_LIB_FAILED };
     }
-});
+}, { rateLimit: { limit: 10, windowMs: 10 * 60 * 1000, actionName: "library" } });
 
 
 export const updateLibraryAction = withAuth(async (user, libraryId: string, name: string, icon?: string, color?: string) => {
-
     try {
         const library = await Library.findOne({ _id: libraryId, userId: user._id });
         if (!library) {
@@ -410,7 +406,7 @@ export const updateLibraryAction = withAuth(async (user, libraryId: string, name
         console.error(LOG_MESSAGES.FILE.UPDATE_LIB_FAIL, error);
         return { error: MESSAGES.ERRORS.UPDATE_LIB_FAILED };
     }
-});
+}, { rateLimit: { limit: 10, windowMs: 10 * 60 * 1000, actionName: "library" } });
 
 
 export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {

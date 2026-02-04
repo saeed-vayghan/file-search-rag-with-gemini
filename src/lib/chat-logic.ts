@@ -1,4 +1,28 @@
-import { CHAT_CONSTANTS, CHAT_MODES, ChatModeType } from "@/config/constants";
+import { CHAT_CONSTANTS, CHAT_MODES, ChatModeType, ChatScopeType } from "@/config/constants";
+import { MESSAGES } from "@/config/constants";
+
+/**
+ * Pure function to construct a metadata filter for Google AI based on search scope.
+ */
+export function constructRAGFilter(scope?: { type: ChatScopeType; id?: string }): string | undefined {
+    if (scope?.type === 'library' && scope.id) {
+        return `library_id = "${scope.id}"`;
+    } else if (scope?.type === 'file' && scope.id) {
+        return `db_file_id = "${scope.id}"`;
+    }
+    return undefined;
+}
+
+/**
+ * Pure function to parse and shape grounding metadata from Google AI response.
+ */
+export function parseGroundingCitations(groundingMetadata: any): any[] {
+    return groundingMetadata?.groundingChunks?.map((chunk: any, index: number) => ({
+        id: index,
+        uri: chunk.web?.uri || chunk.retrievedContext?.uri,
+        title: chunk.web?.title || chunk.retrievedContext?.title || "Source",
+    })) || [];
+}
 
 /**
  * Pure function to resolve the system instruction based on user settings and requested mode.
@@ -66,8 +90,6 @@ export function mapMessageToUi(m: any) {
         createdAt: m.createdAt.toISOString(),
     };
 }
-
-import { MESSAGES } from "@/config/constants";
 
 /**
  * Pure function to translate technical Google errors to user-friendly messages.

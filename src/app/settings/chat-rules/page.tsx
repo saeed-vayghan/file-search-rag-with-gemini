@@ -10,9 +10,12 @@ import { ArrowLeft, Shield, Sparkles, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/lib/toast";
+import { LOG_MESSAGES, MESSAGES } from "@/config/constants";
 
 export default function ChatRulesPage() {
     const { t, dir } = useI18n();
+    const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<ChatModeSettings | null>(null);
@@ -21,16 +24,38 @@ export default function ChatRulesPage() {
         async function load() {
             setLoading(true);
             const data = await getChatModeSettings();
-            if (data) setSettings(data);
+            if (data && "error" in data) {
+                console.error(LOG_MESSAGES.USER.FETCH_SETTINGS_FAIL, data.error);
+                toast({
+                    title: "Error",
+                    description: data.error || MESSAGES.ERRORS.FETCH_STORE_STATUS_FAILED,
+                    type: "error"
+                });
+            } else if (data) {
+                setSettings(data);
+            }
             setLoading(false);
         }
         load();
-    }, []);
+    }, [toast]);
 
     const handleSave = async () => {
         if (!settings) return;
         setSaving(true);
-        await updateChatModeSettings(settings);
+        const result = await updateChatModeSettings(settings);
+        if (result && "error" in result) {
+            toast({
+                title: "Error",
+                description: result.error || MESSAGES.ERRORS.UPDATE_SETTINGS_FAILED,
+                type: "error"
+            });
+        } else {
+            toast({
+                title: "Success",
+                description: "Settings updated successfully",
+                type: "success"
+            });
+        }
         setSaving(false);
     };
 

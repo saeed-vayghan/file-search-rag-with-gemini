@@ -10,6 +10,7 @@ import Message from "@/models/Message";
 import { MESSAGES, LOG_MESSAGES, CHAT_SCOPES, CHAT_ROLES, CHAT_MODES, ChatScopeType, ChatRoleType, ChatModeType } from "@/config/constants";
 import { revalidatePath } from "next/cache";
 import { resolveSystemInstruction, extractGoogleFileIdsFromCitations, enrichCitationsWithFileNames, mapMessageToUi } from "@/lib/chat-logic";
+import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
 
 export type ChatMessage = {
     id?: string;
@@ -71,7 +72,6 @@ export const sendMessageAction = withAuth(async (
         };
         if (scope === CHAT_SCOPES.FILE) messageData.fileId = contextId;
         if (scope === CHAT_SCOPES.LIBRARY) messageData.libraryId = contextId;
-        // Global scope has no specific ID (or userId implicitly)
 
         await Message.create(messageData);
 
@@ -92,13 +92,11 @@ export const sendMessageAction = withAuth(async (
             replyPreview: replyText.substring(0, 100) + (replyText.length > 100 ? '...' : ''),
         });
 
-        // 4.5 Resolve Citations (Map Google File ID -> Display Name)
+        // 4.5 Resolve Citations
         let enrichedCitations = result.citations || [];
         try {
             if (enrichedCitations.length > 0) {
                 const googleFileIds = extractGoogleFileIdsFromCitations(enrichedCitations);
-                logDebug("Chat", "Extracted IDs:", googleFileIds);
-
                 if (googleFileIds.length > 0) {
                     const files = await FileModel.find({
                         $or: [
@@ -107,8 +105,6 @@ export const sendMessageAction = withAuth(async (
                         ]
                     }).select("googleFileId displayName localPath").lean();
 
-                    logDebug("Chat", "Found Files:", files.map(f => `${f.googleFileId} -> ${f.displayName}`));
-
                     const fileMap = new Map();
                     files.forEach(f => {
                         if (f.googleFileId) fileMap.set(f.googleFileId, f);
@@ -116,21 +112,17 @@ export const sendMessageAction = withAuth(async (
                     });
 
                     enrichedCitations = enrichCitationsWithFileNames(enrichedCitations, fileMap);
-                    logDebug("Chat", "Enriched Citations:", JSON.stringify(enrichedCitations, null, 2));
                 }
             }
         } catch (citationError) {
             console.warn(LOG_MESSAGES.CHAT.ENRICH_CITATIONS_FAIL, citationError);
-            // Fallback to original citations if mapping fails
         }
 
-        // 5. Save Assistant Message with Citations
+        // 5. Save Assistant Message
         const assistantMessageData = { ...messageData, role: CHAT_ROLES.ASSISTANT, content: replyText, citations: enrichedCitations };
         await Message.create(assistantMessageData);
 
-        // Revalidate cache
         if (scope === CHAT_SCOPES.FILE) revalidatePath(`/chat/${contextId}`);
-        // TODO: Revalidate library/global paths when created
 
         return {
             reply: replyText,
@@ -143,7 +135,7 @@ export const sendMessageAction = withAuth(async (
             error: error instanceof Error ? error.message : MESSAGES.ERRORS.GENERIC_ERROR,
         };
     }
-});
+}, { rateLimit: RATE_LIMIT_CONFIG.CHAT });
 
 
 

@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { stat } from "fs/promises";
 import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo, logWarn } from "@/lib/logger";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
-import { translateGoogleError } from "@/lib/chat-logic";
+import { translateGoogleError, constructRAGFilter, parseGroundingCitations } from "@/lib/chat-logic";
 
 if (!process.env.GOOGLE_API_KEY) {
     throw new Error(MESSAGES.ERRORS.GOOGLE_API_KEY_MISSING);
@@ -139,17 +139,9 @@ export async function search(
     systemInstruction?: string,
     aiClient: GoogleGenAI = getAIClient()
 ) {
-    const startTime = Date.now();
-
-    // Construct Metadata Filter
-    let metadataFilter: string | undefined;
-    if (scope?.type === 'library' && scope.id) {
-        metadataFilter = `library_id = "${scope.id}"`;
-    } else if (scope?.type === 'file' && scope.id) {
-        metadataFilter = `db_file_id = "${scope.id}"`;
-    }
-
     try {
+        const metadataFilter = constructRAGFilter(scope);
+
         const response = await aiClient.models.generateContent({
             model: MODEL_NAME,
             contents: query,
@@ -158,25 +150,15 @@ export async function search(
                 tools: [{
                     fileSearch: {
                         fileSearchStoreNames: [storeName],
-                        metadataFilter: metadataFilter || undefined
+                        metadataFilter
                     } as any
                 }]
             }
         });
 
-        // Parse Citations from Grounding Metadata
-        const candidate = response.candidates?.[0];
-        const groundingMetadata = candidate?.groundingMetadata;
-
-        const citations = groundingMetadata?.groundingChunks?.map((chunk: any, index: number) => ({
-            id: index,
-            uri: chunk.web?.uri || chunk.retrievedContext?.uri,
-            title: chunk.web?.title || chunk.retrievedContext?.title || "Source",
-        })) || [];
-
         return {
             text: response.text,
-            citations
+            citations: parseGroundingCitations(response.candidates?.[0]?.groundingMetadata)
         };
     } catch (error: any) {
         console.error(LOG_MESSAGES.GOOGLE.SEARCH_FAIL, error);

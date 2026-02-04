@@ -79,6 +79,7 @@ export const MESSAGES = {
         FILE_NOT_FOUND_ON_DISK: "File not found on disk",
         INTERNAL_SERVER_ERROR: "Internal server error",
         INGESTION_FAILED: "Ingestion failed",
+        RATE_LIMIT_EXCEEDED: "Too many requests. Please try again later.",
     },
     INFO: {
         NO_RELEVANT_INFO: "I couldn't find relevant information in your documents.",
