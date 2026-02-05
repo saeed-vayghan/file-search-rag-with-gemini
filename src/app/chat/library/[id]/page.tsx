@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, use } from "react";
 import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
-import { getLibraryFilesAction } from "@/actions/file-actions";
+import { getFilesAction } from "@/actions/file-actions";
 import { ArrowLeft, Send, Paperclip, Trash2, FolderOpen, Loader2, Shield, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
@@ -39,7 +39,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
     // Fetch Library Info
     useEffect(() => {
         async function loadLib() {
-            const result = await getLibraryFilesAction(libraryId);
+            const result = await getFilesAction(libraryId);
             if (!("error" in result) && result.library) {
                 setLibraryInfo(result.library);
             }

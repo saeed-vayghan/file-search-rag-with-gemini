@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { sendMessageAction, getChatHistoryAction, deleteChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
-import { getLibrariesAction } from "@/actions/file-actions";
+import { getLibrariesAction } from "@/actions/lib-actions";
 import { ArrowLeft, Send, Paperclip, Trash2, Globe, Loader2, ChevronDown, FolderOpen, Check, Shield, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";

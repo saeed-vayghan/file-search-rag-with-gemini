@@ -1,4 +1,4 @@
-import { getLibrariesAction } from "@/actions/file-actions";
+import { getLibrariesAction } from "@/actions/lib-actions";
 import { LibrariesView } from "@/components/LibrariesView";
 
 // Force dynamic rendering

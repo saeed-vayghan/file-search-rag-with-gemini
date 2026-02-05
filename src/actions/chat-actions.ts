@@ -20,6 +20,83 @@ export type ChatMessage = {
     createdAt?: string;
 };
 
+export type DeleteHistoryOptions =
+    | { mode: "all" }
+    | { mode: "range"; from: string; to: string }; // ISO Date strings
+
+
+/**
+ * Validates and retrieves the Google Store ID for a user.
+ */
+async function getValidStoreId(userId: any): Promise<string> {
+    const userWithStore = await User.findById(userId).populate("primaryStoreId");
+    if (!userWithStore || !userWithStore.primaryStoreId) {
+        throw new Error(MESSAGES.ERRORS.NO_STORE);
+    }
+    const googleStoreId = (userWithStore.primaryStoreId as any)?.googleStoreId;
+    if (!googleStoreId) {
+        throw new Error(MESSAGES.ERRORS.INVALID_STORE);
+    }
+    return googleStoreId;
+}
+
+/**
+ * Persists a chat message toward the DB.
+ */
+async function persistMessage(data: {
+    role: ChatRoleType;
+    content: string;
+    scope: ChatScopeType;
+    userId: any;
+    mode: ChatModeType;
+    contextId: string;
+    citations?: any[];
+}) {
+    const messageData: any = {
+        role: data.role,
+        content: data.content,
+        scope: data.scope,
+        mode: data.mode,
+        userId: data.userId,
+        citations: data.citations,
+    };
+    if (data.scope === CHAT_SCOPES.FILE) messageData.fileId = data.contextId;
+    if (data.scope === CHAT_SCOPES.LIBRARY) messageData.libraryId = data.contextId;
+
+    return await Message.create(messageData);
+}
+
+/**
+ * Enriches raw citations from Google with DB file display names.
+ */
+async function resolveCitations(citations: any[]) {
+    if (!citations || citations.length === 0) return [];
+
+    try {
+        const googleFileIds = extractGoogleFileIdsFromCitations(citations);
+        if (googleFileIds.length === 0) return citations;
+
+        const files = await FileModel.find({
+            $or: [
+                { googleFileId: { $in: googleFileIds } },
+                { googleFileId: { $in: googleFileIds.map((id: string) => `files/${id}`) } }
+            ]
+        }).select("googleFileId displayName localPath").lean();
+
+        const fileMap = new Map();
+        files.forEach(f => {
+            if (f.googleFileId) fileMap.set(f.googleFileId, f);
+            if (f.googleFileId) fileMap.set(f.googleFileId.replace("files/", ""), f);
+        });
+
+        return enrichCitationsWithFileNames(citations, fileMap);
+    } catch (error) {
+        console.warn(LOG_MESSAGES.CHAT.ENRICH_CITATIONS_FAIL, error);
+        return citations;
+    }
+}
+
+
 export const sendMessageAction = withAuth(async (
     user,
     contextId: string,
@@ -29,53 +106,26 @@ export const sendMessageAction = withAuth(async (
     mode?: ChatModeType
 ): Promise<{ reply: string; citations?: any[]; error?: string }> => {
     try {
-        // User already authenticated, get populated store
-        const userWithStore = await User.findById(user._id).populate("primaryStoreId");
+        // 1. Validate Store
+        const googleStoreId = await getValidStoreId(user._id);
 
-        if (!userWithStore || !userWithStore.primaryStoreId) {
-            return {
-                reply: "",
-                error: MESSAGES.ERRORS.NO_STORE,
-            };
-        }
-
-        const googleStoreId = (userWithStore.primaryStoreId as any)?.googleStoreId;
-
-        if (!googleStoreId) {
-            return {
-                reply: "",
-                error: MESSAGES.ERRORS.INVALID_STORE,
-            };
-        }
-
-        // 2. Determine Chat Mode & Instruction
-        const defaultMode = (user.settings?.defaultMode || CHAT_MODES.LIMITED) as ChatModeType;
-        const requestedMode = mode || defaultMode;
+        // 2. Resolve Mode & Instruction
+        const requestedMode = mode || (user.settings?.defaultMode || CHAT_MODES.LIMITED) as ChatModeType;
         const systemInstruction = resolveSystemInstruction(user.settings, requestedMode);
 
-        // Log chat request details
-        logChatRequest({
-            scope,
-            contextId,
-            chatMode: requestedMode,
-            userMessage: newMessage,
-            systemInstruction,
-        });
+        logChatRequest({ scope, contextId, chatMode: requestedMode, userMessage: newMessage, systemInstruction });
 
         // 3. Save User Message
-        const messageData: any = {
+        await persistMessage({
             role: CHAT_ROLES.USER,
             content: newMessage,
             scope,
             mode: requestedMode,
             userId: user._id,
-        };
-        if (scope === CHAT_SCOPES.FILE) messageData.fileId = contextId;
-        if (scope === CHAT_SCOPES.LIBRARY) messageData.libraryId = contextId;
+            contextId
+        });
 
-        await Message.create(messageData);
-
-        // 4. Perform RAG Search (Scoped)
+        // 4. AIService RAG Search
         const result = await GoogleAIService.search(
             googleStoreId,
             newMessage,
@@ -84,7 +134,6 @@ export const sendMessageAction = withAuth(async (
         );
         const replyText = result.text || MESSAGES.INFO.NO_RELEVANT_INFO;
 
-        // Log chat response details
         logChatResponse({
             chatMode: requestedMode,
             replyLength: replyText.length,
@@ -92,47 +141,27 @@ export const sendMessageAction = withAuth(async (
             replyPreview: replyText.substring(0, 100) + (replyText.length > 100 ? '...' : ''),
         });
 
-        // 4.5 Resolve Citations
-        let enrichedCitations = result.citations || [];
-        try {
-            if (enrichedCitations.length > 0) {
-                const googleFileIds = extractGoogleFileIdsFromCitations(enrichedCitations);
-                if (googleFileIds.length > 0) {
-                    const files = await FileModel.find({
-                        $or: [
-                            { googleFileId: { $in: googleFileIds } },
-                            { googleFileId: { $in: googleFileIds.map((id: string) => `files/${id}`) } }
-                        ]
-                    }).select("googleFileId displayName localPath").lean();
+        // 5. Enrich & Save Assistant Message
+        const enrichedCitations = await resolveCitations(result.citations || []);
 
-                    const fileMap = new Map();
-                    files.forEach(f => {
-                        if (f.googleFileId) fileMap.set(f.googleFileId, f);
-                        if (f.googleFileId) fileMap.set(f.googleFileId.replace("files/", ""), f);
-                    });
-
-                    enrichedCitations = enrichCitationsWithFileNames(enrichedCitations, fileMap);
-                }
-            }
-        } catch (citationError) {
-            console.warn(LOG_MESSAGES.CHAT.ENRICH_CITATIONS_FAIL, citationError);
-        }
-
-        // 5. Save Assistant Message
-        const assistantMessageData = { ...messageData, role: CHAT_ROLES.ASSISTANT, content: replyText, citations: enrichedCitations };
-        await Message.create(assistantMessageData);
+        await persistMessage({
+            role: CHAT_ROLES.ASSISTANT,
+            content: replyText,
+            scope,
+            mode: requestedMode,
+            userId: user._id,
+            contextId,
+            citations: enrichedCitations
+        });
 
         if (scope === CHAT_SCOPES.FILE) revalidatePath(`/chat/${contextId}`);
 
-        return {
-            reply: replyText,
-            citations: enrichedCitations
-        };
-    } catch (error) {
+        return { reply: replyText, citations: enrichedCitations };
+    } catch (error: any) {
         console.error(LOG_MESSAGES.CHAT.ACTION_FAIL, error);
         return {
             reply: "",
-            error: error instanceof Error ? error.message : MESSAGES.ERRORS.GENERIC_ERROR,
+            error: error.message || MESSAGES.ERRORS.GENERIC_ERROR,
         };
     }
 }, { rateLimit: RATE_LIMIT_CONFIG.CHAT });
@@ -185,9 +214,6 @@ export const getChatHistoryAction = withAuth(async (
     }
 });
 
-export type DeleteHistoryOptions =
-    | { mode: "all" }
-    | { mode: "range"; from: string; to: string }; // ISO Date strings
 
 export const deleteChatHistoryAction = withAuth(async (
     user,

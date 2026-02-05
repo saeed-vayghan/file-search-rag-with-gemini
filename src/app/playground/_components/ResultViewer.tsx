@@ -2,7 +2,7 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlaygroundResult } from "@/actions/playground";
+import { PlaygroundResult } from "@/actions/playground-actions";
 import { Loader2, Terminal, AlertCircle, CheckCircle } from "lucide-react";
 
 interface ResultViewerProps {

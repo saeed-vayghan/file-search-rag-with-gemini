@@ -11,6 +11,7 @@ if (!process.env.GOOGLE_API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
+
 export interface PlaygroundResult {
     success: boolean;
     output?: any;
@@ -18,7 +19,6 @@ export interface PlaygroundResult {
     error?: string;
     durationMs: number;
 }
-
 
 
 export const executePlaygroundCode = withAuth(async (user, code: string): Promise<PlaygroundResult> => {

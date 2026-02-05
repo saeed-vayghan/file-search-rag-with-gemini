@@ -6,18 +6,19 @@ import FileModel from "@/models/File";
 import Library from "@/models/Library";
 import Store from "@/models/Store";
 import * as GoogleAIService from "@/lib/google";
-import { logInfo, logDangerousOperation, logDebug } from "@/lib/logger";
+import { logInfo, logDangerousOperation } from "@/lib/logger";
 import { withAuth } from "@/lib/auth";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { rm } from "fs/promises";
 import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
-import { FILE_STATUS, UI_DEFAULTS, LIBRARY_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
-import { validateFileSize, validateStoreCapacity, mapFileToUi, generateLocalFilePath, mapStoreStatsToUi, classifyGoogleError, GOOGLE_ERROR_TYPES } from "@/lib/file";
+import { FILE_STATUS, UI_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
+import { validateFileSize, validateStoreCapacity, mapFileToUi, generateLocalFilePath, mapStoreStatsToUi } from "@/lib/file";
 import Message from "@/models/Message";
 import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
 import { formatBytes } from "@/lib/utils";
+import { ensureUserStore, resolveLibraryId, importFileWithRetry, deleteFileInternal } from "./utils";
 
 
 export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
@@ -47,109 +48,6 @@ export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?
     }
 });
 
-/**
- * Helper: Ensures the user has a valid Store record.
- * Handles creation and recovery of stores.
- */
-async function ensureUserStore(user: any) {
-    if (!user.primaryStoreId) {
-        const googleStoreName = await GoogleAIService.createStore(`store-${user.email}`);
-        const store = await Store.create({
-            userId: user._id,
-            googleStoreId: googleStoreName,
-            displayName: `Main Library (${user.email})`,
-        });
-        user.primaryStoreId = store._id;
-        await user.save();
-        return store;
-    }
-
-    const store = await Store.findById(user.primaryStoreId);
-    if (!store) {
-        // Recovery: If primaryStoreId exists but Store record is missing
-        const googleStoreName = await GoogleAIService.createStore(`recovery-store-${user.email}`);
-        const newStore = await Store.create({
-            userId: user._id,
-            googleStoreId: googleStoreName,
-            displayName: `Recovered Library (${user.email})`,
-        });
-        user.primaryStoreId = newStore._id;
-        await user.save();
-        return newStore;
-    }
-
-    return store;
-}
-
-/**
- * Helper: Refactored logic to resolve a valid Library ID.
- */
-async function resolveLibraryId(user: any, libraryIdCandidate: string | null | undefined): Promise<string> {
-    if (libraryIdCandidate && libraryIdCandidate !== "null" && libraryIdCandidate !== "undefined") {
-        return libraryIdCandidate;
-    }
-
-    // Find or Create Default Library
-    const defaultLib = await Library.findOne({ userId: user._id, name: LIBRARY_DEFAULTS.NAME });
-    if (defaultLib) {
-        return defaultLib._id.toString();
-    }
-
-    const newLib = await Library.create({
-        userId: user._id,
-        name: LIBRARY_DEFAULTS.NAME,
-        icon: UI_DEFAULTS.LIBRARY.ICON,
-        color: UI_DEFAULTS.LIBRARY.COLOR,
-        description: LIBRARY_DEFAULTS.DESCRIPTION
-    });
-    return newLib._id.toString();
-}
-
-/**
- * Helper: Handles the ingestion process, including self-healing (re-creating store) if needed.
- */
-async function importFileWithRetry(
-    store: any,
-    googleFileId: string,
-    metadata: { libraryId: string, dbFileId: string },
-    user: any
-): Promise<{ operationName: string, updatedStore?: any }> {
-    try {
-        const opName = await GoogleAIService.importFileToStore(
-            store.googleStoreId,
-            googleFileId,
-            metadata
-        );
-        return { operationName: opName };
-    } catch (error: any) {
-        // Check if Store is missing/expired
-        const errorType = classifyGoogleError(error);
-        if (errorType !== GOOGLE_ERROR_TYPES.STORE_EXPIRED && errorType !== GOOGLE_ERROR_TYPES.STORE_NOT_FOUND) {
-            throw error; // Not a recoverable error
-        }
-
-        console.warn(LOG_MESSAGES.FILE.UPLOAD_STORE_RETRY);
-
-        // Create new store on Google
-        const newGoogleStoreName = await GoogleAIService.createStore(`resync-store-${user.email}`);
-        if (!newGoogleStoreName) {
-            throw new Error(MESSAGES.ERRORS.GOOGLE_STORE_CREATION_FAILED);
-        }
-
-        // Update Store record
-        store.googleStoreId = newGoogleStoreName;
-        store.lastSyncedAt = new Date();
-        const updatedStore = await store.save();
-
-        // Retry import with new store
-        const opName = await GoogleAIService.importFileToStore(
-            newGoogleStoreName,
-            googleFileId,
-            metadata
-        );
-        return { operationName: opName, updatedStore };
-    }
-}
 
 export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     const file = formData.get("file") as File | null;
@@ -267,14 +165,43 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
     }
 }, { rateLimit: RATE_LIMIT_CONFIG.UPLOAD });
 
-export const getFilesAction = withAuth(async (user) => {
-    const files = await FileModel.find({ userId: user._id })
-        .sort({ createdAt: -1 })
-        .populate("libraryId", "name icon")
-        .lean();
 
-    return files.map(mapFileToUi);
+export const getFilesAction = withAuth(async (user, libraryId?: string): Promise<{ files: any[]; library?: any; error?: string }> => {
+    try {
+        const query: any = { userId: user._id };
+        if (libraryId) {
+            query.libraryId = libraryId;
+        }
+
+        const files = await FileModel.find(query)
+            .sort({ createdAt: -1 })
+            .populate("libraryId", "name icon color description")
+            .lean();
+
+        let libraryData = null;
+        if (libraryId) {
+            const library = await Library.findOne({ _id: libraryId, userId: user._id }).lean();
+            if (library) {
+                libraryData = {
+                    id: library._id.toString(),
+                    name: library.name,
+                    icon: library.icon || UI_DEFAULTS.LIBRARY.ICON,
+                    color: library.color || UI_DEFAULTS.LIBRARY.COLOR,
+                    description: library.description || "",
+                };
+            }
+        }
+
+        return {
+            files: files.map(mapFileToUi),
+            library: libraryData || undefined
+        };
+    } catch (error) {
+        console.error(LOG_MESSAGES.FILE.GET_FILES_FAIL, error);
+        return { files: [], error: MESSAGES.ERRORS.GENERIC_ERROR };
+    }
 });
+
 
 export const getFileAction = withAuth(async (user, fileId: string) => {
     try {
@@ -291,6 +218,7 @@ export const getFileAction = withAuth(async (user, fileId: string) => {
         return null;
     }
 });
+
 
 export const getUserStatsAction = withAuth(async (user) => {
     const userDoc = await User.findById(user._id);
@@ -322,153 +250,6 @@ export const getUserStatsAction = withAuth(async (user) => {
     };
 });
 
-export const getLibrariesAction = withAuth(async (user) => {
-    // Get real libraries from DB
-    const libraries = await Library.find({ userId: user._id }).lean();
-
-    // Count files per library
-    const result = await Promise.all(
-        libraries.map(async (lib) => {
-            const fileCount = await FileModel.countDocuments({
-                userId: user._id,
-                libraryId: lib._id
-            });
-            return {
-                id: lib._id.toString(),
-                name: lib.name,
-                description: lib.description || "",
-                icon: lib.icon || UI_DEFAULTS.LIBRARY.ICON,
-                color: lib.color || UI_DEFAULTS.LIBRARY.COLOR,
-                count: fileCount,
-            };
-        })
-    );
-
-    return result;
-});
-
-export const createLibraryAction = withAuth(async (user, name: string, icon?: string, color?: string) => {
-    try {
-        const library = await Library.create({
-            userId: user._id,
-            name,
-            icon: icon || UI_DEFAULTS.LIBRARY.ICON,
-            color: color || UI_DEFAULTS.LIBRARY.COLOR,
-        });
-
-        revalidatePath(PATHS.HOME);
-        revalidatePath(PATHS.LIBRARIES);
-
-        return {
-            success: true,
-            library: {
-                id: library._id.toString(),
-                name: library.name,
-                icon: library.icon,
-                color: library.color,
-            }
-        };
-    } catch (error) {
-        console.error(LOG_MESSAGES.FILE.CREATE_LIB_FAIL, error);
-        return { error: MESSAGES.ERRORS.CREATE_LIB_FAILED };
-    }
-}, { rateLimit: { limit: 10, windowMs: 10 * 60 * 1000, actionName: "library" } });
-
-export const updateLibraryAction = withAuth(async (user, libraryId: string, name: string, icon?: string, color?: string) => {
-    try {
-        const library = await Library.findOne({ _id: libraryId, userId: user._id });
-        if (!library) {
-            return { error: MESSAGES.ERRORS.LIB_NOT_FOUND };
-        }
-
-        library.name = name;
-        if (icon) library.icon = icon;
-        if (color) library.color = color;
-
-        await library.save();
-
-        revalidatePath(PATHS.HOME);
-        revalidatePath(PATHS.LIBRARIES);
-        revalidatePath(`${PATHS.LIBRARIES}/${libraryId}`);
-
-        return {
-            success: true,
-            library: {
-                id: library._id.toString(),
-                name: library.name,
-                icon: library.icon,
-                color: library.color,
-            }
-        };
-    } catch (error) {
-        console.error(LOG_MESSAGES.FILE.UPDATE_LIB_FAIL, error);
-        return { error: MESSAGES.ERRORS.UPDATE_LIB_FAILED };
-    }
-}, { rateLimit: { limit: 10, windowMs: 10 * 60 * 1000, actionName: "library" } });
-
-export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
-
-    try {
-        const library = await Library.findOne({ _id: libraryId, userId: user._id });
-        if (!library) {
-            return { error: MESSAGES.ERRORS.LIB_NOT_FOUND };
-        }
-
-        // Cascade Delete Files
-        const files = await FileModel.find({ libraryId: library._id, userId: user._id });
-        logDebug("DeleteLibrary", `Found ${files.length} files in library ${library.name} (${libraryId})`);
-
-        let deletedCount = 0;
-        let failedCount = 0;
-
-        // Execute sequentially to avoid DB connection race conditions and rate limits
-        for (const file of files) {
-            try {
-                logDebug("DeleteLibrary", `Deleting file: ${file._id}`);
-                // Since deleteFileAction is now authenticated, we can't call it directly as a function easily expecting the same user context unless we refactor.
-                // However, since we are already inside an authenticated action (deleteLibraryAction) and we have the user,
-                // we can just call the logic OR call the action if we pass the context.
-                // But `deleteFileAction` expects (user, fileId).
-                // Actually, `withAuth` returns a function that expects (fileId).
-                // But the `user` is injected by the middleware.
-                // We cannot call an Action from another Action and expect Auth to pass through via headers in a direct import call.
-                // We must extract the logic or invoke `deleteFileInternal` (refactor pattern).
-
-                // Refactor Strategy: We will call the logic directly or we need to separate Logic from Action.
-                // For now, I will inline the internal deletion logic or assume I can call a helper.
-                // Let's create a helper `deleteFileInternal` to reuse logic.
-                const result = await deleteFileInternal(user, file._id.toString());
-
-                if (result.success) {
-                    deletedCount++;
-                } else {
-                    console.error(`${LOG_MESSAGES.FILE.DELETE_LIB_FILE_FAIL} ${file._id}: ${result.error}`);
-                    failedCount++;
-                }
-            } catch (err) {
-                console.error(`${LOG_MESSAGES.FILE.DELETE_LIB_EXCEPTION} ${file._id}:`, err);
-                failedCount++;
-            }
-        }
-
-        logInfo("DeleteLibrary", `Summary: ${deletedCount} deleted, ${failedCount} failed.`);
-
-        if (failedCount > 0) {
-            return { error: `Failed to delete ${failedCount} files. Library not deleted.` };
-        }
-
-        // Delete the library only if all files are gone
-        await Library.findByIdAndDelete(libraryId);
-
-        revalidatePath(PATHS.HOME);
-        revalidatePath(PATHS.LIBRARIES);
-
-        return { success: true, message: MESSAGES.SUCCESS.LIBRARY_DELETED };
-    } catch (error) {
-        console.error(LOG_MESSAGES.FILE.DELETE_LIB_FAIL, error);
-        return { error: MESSAGES.ERRORS.DELETE_LIB_FAILED };
-    }
-});
 
 export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
 
@@ -510,87 +291,11 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
     }
 });
 
-// Internal helper for usage within other server actions (avoids Auth middleware recursion issues)
-// Assumes caller has already verified User
-async function deleteFileInternal(user: any, fileId: string) {
-    try {
-        const file = await FileModel.findOne({ _id: fileId, userId: user._id });
-        if (!file) {
-            return { error: MESSAGES.ERRORS.FILE_NOT_FOUND };
-        }
-
-        // 1. Delete from Google Cloud (Store Document + File)
-        let googleStatus = "Skipped";
-        if (file.googleFileId) {
-            try {
-                // A. Explicitly delete from Store (User Request)
-                // We already have the user object passed in
-                if (user && user.primaryStoreId) {
-                    const store = await Store.findById(user.primaryStoreId);
-                    if (store && store.googleStoreId) {
-                        await GoogleAIService.deleteDocumentFromStore(store.googleStoreId, file.googleFileId);
-                    }
-                }
-
-                // B. Delete the raw File
-                const deleted = await GoogleAIService.deleteFile(file.googleFileId);
-                googleStatus = deleted ? "Deleted" : "Already Cleaned";
-            } catch (e) {
-                googleStatus = "Failed (Ignored)";
-                console.error(LOG_MESSAGES.FILE.GOOGLE_DELETE_FAIL, e);
-            }
-        }
-
-        // 2. Delete Local File
-        let localStatus = "Skipped";
-        if (file.localPath) {
-            try {
-                const absolutePath = join(process.cwd(), file.localPath);
-                await unlink(absolutePath);
-                localStatus = "Deleted";
-            } catch (err) {
-                console.warn(`${LOG_MESSAGES.FILE.LOCAL_DELETE_FAIL} ${file.localPath}:`, err);
-                localStatus = "Failed/Missing";
-            }
-        }
-
-        // 3. Delete Chat History
-        await Message.deleteMany({ fileId: file._id });
-
-        // 4. Delete DB Record
-        await FileModel.findByIdAndDelete(fileId);
-
-        // 5. Update Store Stats
-        // Re-fetch user just to be sure we have latest or use passed user
-        const freshUser = await User.findById(user._id);
-        if (freshUser && freshUser.primaryStoreId) {
-            try {
-                const store = await Store.findById(freshUser.primaryStoreId);
-                if (store) {
-                    store.fileCount = Math.max(0, store.fileCount - 1);
-                    store.sizeBytes = Math.max(0, store.sizeBytes - (file.sizeBytes || 0));
-                    await store.save();
-                }
-            } catch (storeError) {
-                console.warn(LOG_MESSAGES.FILE.STORE_STATS_FAIL, storeError);
-            }
-        }
-
-        revalidatePath(PATHS.HOME);
-
-        return {
-            success: true,
-            message: `Cleanup Complete: Remote (${googleStatus}), Local (${localStatus}).`
-        };
-    } catch (error) {
-        console.error(LOG_MESSAGES.FILE.DELETE_FAIL, error);
-        return { error: MESSAGES.ERRORS.DELETE_FILE_FAILED };
-    }
-}
 
 export const deleteFileAction = withAuth(async (user, fileId: string) => {
     return deleteFileInternal(user, fileId);
 });
+
 
 export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) => {
     try {
@@ -610,29 +315,6 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
     }
 });
 
-export const getLibraryFilesAction = withAuth(async (user, libraryId: string) => {
-
-    try {
-        const library = await Library.findOne({ _id: libraryId, userId: user._id }).lean();
-        if (!library) return { files: [], library: null };
-
-        const files = await FileModel.find({ userId: user._id, libraryId }).sort({ createdAt: -1 }).lean();
-
-        return {
-            library: {
-                id: library._id.toString(),
-                name: library.name,
-                icon: library.icon || UI_DEFAULTS.LIBRARY.ICON,
-                color: library.color || UI_DEFAULTS.LIBRARY.COLOR,
-                description: library.description || "",
-            },
-            files: files.map(mapFileToUi)
-        };
-    } catch (error) {
-        console.error(LOG_MESSAGES.FILE.GET_LIB_FILES_FAIL, error);
-        return { files: [], library: null };
-    }
-});
 
 export const getStoreStatusAction = withAuth(async (user, force: boolean = false) => {
     if (!user.primaryStoreId) {
@@ -667,6 +349,7 @@ export const getStoreStatusAction = withAuth(async (user, force: boolean = false
         return { error: MESSAGES.ERRORS.FETCH_STORE_STATUS_FAILED };
     }
 });
+
 
 export const purgeUserDataAction = withAuth(async (user) => {
 

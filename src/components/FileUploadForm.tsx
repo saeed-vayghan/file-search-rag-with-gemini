@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn, calculateSHA256 } from "@/lib/utils";
-import { uploadFileAction, getLibrariesAction, checkFileDuplicate } from "@/actions/file-actions";
+import { uploadFileAction, checkFileDuplicate } from "@/actions/file-actions";
+import { getLibrariesAction } from "@/actions/lib-actions";
 import { Upload, Loader2, CheckCircle, XCircle, ChevronDown } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 

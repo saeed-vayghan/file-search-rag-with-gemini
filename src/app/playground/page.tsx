@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PLAYGROUND_SCENARIOS, PlaygroundScenario } from "@/config/playground-scenarios";
-import { executePlaygroundCode, PlaygroundResult } from "@/actions/playground";
+import { executePlaygroundCode, PlaygroundResult } from "@/actions/playground-actions";
 import { CodeEditor } from "./_components/CodeEditor";
 import { ResultViewer } from "./_components/ResultViewer";
 import { Button } from "@/components/ui/button";

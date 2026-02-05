@@ -130,7 +130,7 @@ export const LOG_MESSAGES = {
         GOOGLE_DELETE_FAIL: "Google delete failed during cascade:",
         LOCAL_DELETE_FAIL: "[FileAction] Local file deletion failed for",
         STORE_STATS_FAIL: "[Delete] Failed to update store stats:",
-        GET_LIB_FILES_FAIL: "Get Library Files Failed:",
+        GET_FILES_FAIL: "Get Files Failed:",
         GET_STORE_STATUS_FAIL: "Get Store Status Failed:",
         PURGE_FAIL: "Purge Action Failed:",
         PURGE_LOCAL_FAIL: "   [FS] Failed to delete local directory (might not exist):"

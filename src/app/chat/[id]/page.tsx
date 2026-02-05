@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, use } from "react";
 import { Button } from "@/components/ui/button";
-import { sendMessageAction, getChatHistoryAction, deleteChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
+import { sendMessageAction, getChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getFileAction } from "@/actions/file-actions";
-import { ArrowLeft, Send, Paperclip, MoreVertical, Search, FileText, Loader2, Clock, HardDrive, CheckCircle, Download, Trash2, Calendar as CalendarIcon, Shield, Sparkles } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, FileText, Loader2, Clock, HardDrive, CheckCircle, Download, Trash2, Calendar as CalendarIcon, Shield, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
 import { ChatCalendar } from "@/components/chat/ChatCalendar";

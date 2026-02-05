@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteLibraryAction } from "@/actions/file-actions";
-import { FolderOpen, ArrowLeft, Plus, Trash2, Loader2, Library } from "lucide-react";
+import { deleteLibraryAction } from "@/actions/lib-actions";
+import { ArrowLeft, Plus, Trash2, Loader2, Library } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { CreateLibraryModal } from "@/components/CreateLibraryModal";

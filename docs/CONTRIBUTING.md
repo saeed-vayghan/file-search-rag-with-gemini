@@ -116,30 +116,37 @@ export default function MyNewPage() {
 
 ## 2. Backend Development
 
-### Architecture
-This project uses **Next.js Server Actions** instead of traditional REST APIs. Server Actions are async functions that run on the server and can be called directly from client components.
+### Architecture & Standards
+This project follows a **Modular Server Actions** pattern with a focus on **Functional Programming** principles:
+
+1. **Side-Effect Isolation**: Complex logic is extracted into pure helpers or unified modules in `@/lib`.
+2. **Semantic Error Patterns**: All actions return standard `{ success: boolean, result?, error? }` objects with semantic error classification.
+3. **Module Consolidation**: Logic is strictly organized into domain directories within `src/lib/` (e.g., `google`, `chat`, `file`).
+4. **Action Decomposition**: Large actions are broken down into smaller internal helpers to ensure readability and testability.
 
 ### Directory Structure
 
 ```
 src/
-├── actions/                # Server Actions (API layer)
-│   ├── chat-actions.ts     # Chat message handling
-│   ├── file-actions.ts     # File CRUD operations
-│   ├── user-actions.ts     # User settings
-│   └── playground.ts       # Google API playground
-├── models/                 # Mongoose schemas
-│   ├── User.ts             # User model
-│   ├── Store.ts            # Vector store reference
-│   ├── Library.ts          # File library grouping
-│   ├── File.ts             # File metadata
-│   └── Message.ts          # Chat message history
-└── lib/                    # Utility libraries
-    ├── db.ts               # MongoDB connection
-    ├── google-ai.ts        # Google Gemini API wrapper
-    ├── hash-utils.ts       # File hashing (SHA-256)
-    ├── utils.ts            # General utilities
-    └── i18n/               # Internationalization
+├── actions/                 # Server Actions (API layer)
+│   ├── action-utils.ts      # Shared action helpers (Internal)
+│   ├── chat-actions.ts      # Chat message handling
+│   ├── file-actions.ts      # File specific operations
+│   ├── lib-actions.ts       # Library specific operations
+│   ├── playground-actions.ts # Code sandbox operations
+│   ├── user-actions.ts      # User profile & settings
+│   └── utils.ts             # Orchestration & shared logic
+├── models/                  # Mongoose schemas
+│   └── ...
+└── lib/                     # Unified modules
+    ├── auth/                # Session & HOF helpers
+    ├── chat/                # Prompting & History
+    ├── database/            # Connection & Base models
+    ├── file/                # validation & mapping
+    ├── google/              # AI Service wrappers
+    ├── i18n/                # Internationalization
+    ├── logger/              # Centralized logging
+    └── utils.ts             # Core UI/Logic helpers
 ```
 
 ### Server Actions ("Routes")
@@ -153,26 +160,27 @@ Server Actions replace traditional API routes. They are marked with `"use server
 - `getChatHistoryAction()`: Load paginated chat history
 - `deleteChatHistoryAction()`: Clear chat history
 
-#### **file-actions.ts**
+#### **file-actions.ts** (Purely File Context)
 - `uploadFileAction()`: Upload file to Google File API
-- `getFilesAction()`: List all user files
+- `getFilesAction()`: List all user files (with optional library filter)
 - `getFileAction()`: Get single file metadata
-- `deleteFileAction()`: Delete file from Google + DB
+- `deleteFileAction()`: Delete file from Google + DB + Local Preview
+- `checkFileDuplicate()`: Content-hash based duplicate check
+- `checkFileStatusAction()`: Google Ingestion status sync
+
+#### **lib-actions.ts** (Library Context)
 - `createLibraryAction()`: Create new library
-- `getLibrariesAction()`: List all libraries
-- `updateLibraryAction()`: Update library metadata
-- `deleteLibraryAction()`: Delete library (keeps files)
-- `createStoreAction()`: Initialize user's vector store
-- `getStoreStatsAction()`: Sync statistics
-- `forceRefreshStoreAction()`: Resync Google Cloud ↔ DB
+- `getLibrariesAction()`: List all libraries with document counts
+- `updateLibraryAction()`: Update library metadata (icon, color, etc)
+- `deleteLibraryAction()`: Cascading delete of library and its files
+
+#### **playground-actions.ts**
+- `executePlaygroundCode()`: Execute Google API code in sandbox
 
 #### **user-actions.ts**
 - `getUserSettingsAction()`: Fetch user settings
 - `updateUserSettingsAction()`: Save settings changes
-- `updateUserAction()`: Update user profile (name, etc.)
-
-#### **playground.ts**
-- `executePlaygroundAction()`: Execute Google API code in sandbox
+- `updateUserAction()`: Update user profile (name, etc)
 
 ### Adding a New Server Action
 
@@ -212,10 +220,10 @@ All models use **Mongoose** for MongoDB:
 
 **Framework**: NextAuth.js v5 (Beta)
 
-**Location**:
-- Config: `src/lib/auth.ts`
-- Middleware Wrapper: `src/lib/auth-middleware.ts`
-- Helpers: `src/lib/auth-helpers.ts`
+**Location**: `@/lib/auth`
+- Config: `lib/auth/auth.ts`
+- Middleware Wrapper: `lib/auth/auth-middleware.ts`
+- Exports: `lib/auth/index.ts`
 
 **Pattern**:
 Instead of global middleware for all routes, we use a **Higher-Order Function (HOF)** pattern for Server Actions to ensure type-safe, secure execution.
@@ -249,7 +257,7 @@ export const mySecureAction = withAuth(async (user, data: string) => {
 
 **Purpose**: Semantic search (RAG), file vectorization
 
-**Location**: `src/lib/google-ai.ts`
+**Location**: `@/lib/google/google-ai.ts`
 
 **API Wrapper** (`GoogleAIService`):
 - `uploadFile()`: Upload file to Google Cloud

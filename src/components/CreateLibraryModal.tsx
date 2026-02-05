@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createLibraryAction } from "@/actions/file-actions";
+import { createLibraryAction } from "@/actions/lib-actions";
 import { X, Loader2, FolderPlus } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

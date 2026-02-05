@@ -10,15 +10,9 @@ import { cn } from "@/lib/utils";
 import { FileUploadForm } from "@/components/FileUploadForm";
 import { FileActionsMenu } from "@/components/FileActionsMenu";
 import { useI18n } from "@/lib/i18n";
-import { TIERS, TierKey, DEFAULT_TIER } from "@/config/limits";
+import { TIERS, TierKey } from "@/config/limits";
 import { FILE_STATUS, UI_DEFAULTS, PATHS, FileStatusType as FileStatus } from "@/config/constants";
 import { Check, Lock, Zap } from "lucide-react";
-import {
-    getFilesAction,
-    getUserStatsAction,
-    getLibrariesAction,
-    uploadFileAction
-} from "@/actions/file-actions";
 
 
 interface DashboardFile {

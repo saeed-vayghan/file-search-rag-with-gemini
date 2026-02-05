@@ -6,6 +6,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function SearchPage() {
     const result = await getFilesAction();
-    const files = ("error" in result) ? [] : result;
+    const files = ("error" in result) ? [] : result.files;
     return <SearchView initialFiles={files} />;
 }
