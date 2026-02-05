@@ -5,6 +5,15 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
   reactCompiler: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '**',
+      },
+    ],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: MAX_FILE_SIZE_BYTES,
