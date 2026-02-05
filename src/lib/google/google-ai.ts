@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { stat } from "fs/promises";
-import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo, logWarn } from "@/lib/logger";
+import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo } from "@/lib/logger";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
 import { translateGoogleError, constructRAGFilter, parseGroundingCitations } from "@/lib/chat";
 import { findMatchingDocument } from "@/lib/file";
@@ -30,9 +30,9 @@ export function getAIClient(): GoogleGenAI {
 export async function uploadFile(
     filePath: string,
     displayName: string,
-    mimeType: string,
-    aiClient: GoogleGenAI = getAIClient()
+    mimeType: string
 ) {
+    const aiClient = getAIClient();
     logFileOperation({ operation: "upload", fileName: displayName, additionalInfo: `Type: ${mimeType}, Path: ${filePath}` });
 
     try {
@@ -61,9 +61,9 @@ export async function uploadFile(
  * 2. Creates a user-specific Vector Store if one doesn't exist.
  */
 export async function createStore(
-    displayName: string,
-    aiClient: GoogleGenAI = getAIClient()
+    displayName: string
 ) {
+    const aiClient = getAIClient();
     logStoreOperation({ operation: "create", storeName: displayName });
     try {
         const store = await aiClient.fileSearchStores.create({
@@ -83,9 +83,9 @@ export async function createStore(
 export async function importFileToStore(
     storeName: string,
     googleFileId: string,
-    metadata: { libraryId: string, dbFileId: string },
-    aiClient: GoogleGenAI = getAIClient()
+    metadata: { libraryId: string, dbFileId: string }
 ) {
+    const aiClient = getAIClient();
     logInfo("GoogleAI", `Importing ${googleFileId} into ${storeName} (Lib: ${metadata.libraryId}, File: ${metadata.dbFileId})`);
     try {
         // Custom Metadata must be strictly typed as stringValue
@@ -115,9 +115,9 @@ export async function importFileToStore(
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getOperationStatus(
-    operation: any,
-    aiClient: GoogleGenAI = getAIClient()
+    operation: any
 ) {
+    const aiClient = getAIClient();
     try {
         const op = await aiClient.operations.get({ operation });
         return {
@@ -137,9 +137,9 @@ export async function search(
     storeName: string,
     query: string,
     scope?: { type: 'global' | 'library' | 'file', id?: string },
-    systemInstruction?: string,
-    aiClient: GoogleGenAI = getAIClient()
+    systemInstruction?: string
 ) {
+    const aiClient = getAIClient();
     try {
         const metadataFilter = constructRAGFilter(scope);
 
@@ -171,9 +171,9 @@ export async function search(
  * 6. Deletes a file from Google's File API.
  */
 export async function deleteFile(
-    fileName: string,
-    aiClient: GoogleGenAI = getAIClient()
+    fileName: string
 ) {
+    const aiClient = getAIClient();
     logFileOperation({ operation: "delete", fileName });
     try {
         await aiClient.files.delete({ name: fileName });
@@ -197,9 +197,9 @@ export async function deleteFile(
  */
 export async function deleteDocumentFromStore(
     storeName: string,
-    googleFileId: string,
-    aiClient: GoogleGenAI = getAIClient()
+    googleFileId: string
 ) {
+    const aiClient = getAIClient();
     logInfo("GoogleAI", `Attempting to remove file ${googleFileId} from store ${storeName}`);
     try {
         // clean ID: "files/abc" -> "abc"
@@ -243,9 +243,9 @@ export async function deleteDocumentFromStore(
  * 7. Inspects a file's metadata from Google's File API.
  */
 export async function getFile(
-    fileName: string,
-    aiClient: GoogleGenAI = getAIClient()
+    fileName: string
 ) {
+    const aiClient = getAIClient();
     logFileOperation({ operation: "inspect", fileName });
     try {
         const file = await aiClient.files.get({ name: fileName });
@@ -260,9 +260,9 @@ export async function getFile(
  * 8. Retrieves metadata for a Vector Store (e.g., size, file count).
  */
 export async function getStoreMetadata(
-    storeName: string,
-    aiClient: GoogleGenAI = getAIClient()
+    storeName: string
 ) {
+    const aiClient = getAIClient();
     logStoreOperation({ operation: "fetch", storeName });
     try {
         const store = await aiClient.fileSearchStores.get({ name: storeName });
@@ -284,9 +284,8 @@ export async function getStoreMetadata(
  * 9. DANGER ZONE: Purges ALL data (Stores + Files) for this API Key.
  * This mimics the cleanup logic in poc/delete-all.js.
  */
-export async function purgeAllUserGoogleData(
-    aiClient: GoogleGenAI = getAIClient()
-) {
+export async function purgeAllUserGoogleData() {
+    const aiClient = getAIClient();
     logDangerousOperation("GoogleAI", "Initiating GLOBAL PURGE...");
 
     // 1. Delete all Stores
