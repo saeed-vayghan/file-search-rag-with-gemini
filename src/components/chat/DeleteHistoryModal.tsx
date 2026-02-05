@@ -17,7 +17,7 @@ interface DeleteHistoryModalProps {
 }
 
 export function DeleteHistoryModal({ fileId, isOpen, onClose, onDeleted }: DeleteHistoryModalProps) {
-    const { t, dir } = useI18n();
+    const { t } = useI18n();
     const [isLoading, setIsLoading] = useState(false);
     const [mode, setMode] = useState<"all" | "range">("all");
     const [fromDate, setFromDate] = useState("");

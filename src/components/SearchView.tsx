@@ -3,12 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileText, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, FileText, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface SearchViewProps {
     initialFiles: any[];
@@ -16,7 +15,6 @@ interface SearchViewProps {
 
 export function SearchView({ initialFiles }: SearchViewProps) {
     const { t, dir } = useI18n();
-    const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [filteredFiles, setFilteredFiles] = useState(initialFiles);
     const [isSearching, setIsSearching] = useState(false);

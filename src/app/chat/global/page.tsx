@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { sendMessageAction, getChatHistoryAction, deleteChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
+import { sendMessageAction, getChatHistoryAction, type ChatMessage } from "@/actions/chat-actions";
 import { getLibrariesAction } from "@/actions/lib-actions";
-import { ArrowLeft, Send, Paperclip, Trash2, Globe, Loader2, ChevronDown, FolderOpen, Check, Shield, Sparkles } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Trash2, Globe, Loader2, ChevronDown, Check, Shield, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n";
@@ -149,20 +149,6 @@ export default function GlobalChatPage() {
             setIsLoading(false);
         }
     };
-
-    function renderMessageWithCitations(content: string) {
-        const parts = content.split(/(\[.*?\])/g);
-        return parts.map((part, i) => {
-            if (part.startsWith("[") && part.endsWith("]")) {
-                return (
-                    <span key={i} className="inline-flex items-center justify-center rounded bg-blue-500/10 px-1.5 py-0.5 text-xs font-medium text-blue-400 mx-1 cursor-pointer hover:bg-blue-500/20 transition-colors">
-                        {part}
-                    </span>
-                );
-            }
-            return part;
-        });
-    }
 
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-slate-950">

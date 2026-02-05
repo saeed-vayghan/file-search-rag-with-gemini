@@ -3,8 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Loader2, Server, AlertTriangle, X } from "lucide-react";
 import { getRemoteFileDebugAction } from "@/actions/file-actions";
-import { useState, useEffect } from "react";
-import { useI18n } from "@/lib/i18n";
+import { useState, useEffect, useCallback } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { ForceEnglishWrapper } from "@/components/ForceEnglishWrapper";
 
@@ -17,18 +16,11 @@ interface InspectFileModalProps {
 }
 
 export function InspectFileModal({ fileId, fileName, isOpen, onClose }: InspectFileModalProps) {
-    const { t, dir } = useI18n();
     const [isLoading, setIsLoading] = useState(false);
     const [data, setData] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (isOpen) {
-            loadData();
-        }
-    }, [isOpen, fileId]);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         setData(null);
@@ -39,12 +31,19 @@ export function InspectFileModal({ fileId, fileName, isOpen, onClose }: InspectF
             } else {
                 setData(result.metadata);
             }
-        } catch (e) {
+        } catch (err) {
+            console.error("Inspect Remote Error:", err);
             setError("Failed to fetch remote data");
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [fileId]);
+
+    useEffect(() => {
+        if (isOpen) {
+            loadData();
+        }
+    }, [isOpen, loadData]);
 
     if (!isOpen) return null;
 

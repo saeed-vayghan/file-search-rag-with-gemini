@@ -36,7 +36,7 @@ export function MessageRenderer({ content, role, cost, tokens }: MessageRenderer
                 remarkPlugins={[remarkGfm]}
                 components={{
                     // Code blocks with simple styling (no syntax highlighting)
-                    code({ node, className, children, ...props }: any) {
+                    code({ className, children, ...props }: any) {
                         const isInline = !className;
 
                         return isInline ? (
@@ -52,7 +52,7 @@ export function MessageRenderer({ content, role, cost, tokens }: MessageRenderer
                         );
                     },
                     // Links - Open in new tab
-                    a({ node, children, href, ...props }) {
+                    a({ children, href, ...props }: any) {
                         return (
                             <a
                                 href={href}
@@ -66,7 +66,7 @@ export function MessageRenderer({ content, role, cost, tokens }: MessageRenderer
                         );
                     },
                     // Tables
-                    table({ node, children, ...props }) {
+                    table({ children, ...props }: any) {
                         return (
                             <div className="overflow-x-auto my-4">
                                 <table className="min-w-full border-collapse border border-slate-700" {...props}>
@@ -75,14 +75,14 @@ export function MessageRenderer({ content, role, cost, tokens }: MessageRenderer
                             </div>
                         );
                     },
-                    th({ node, children, ...props }) {
+                    th({ children, ...props }: any) {
                         return (
                             <th className="border border-slate-700 px-3 py-2 bg-slate-800 text-left font-semibold" {...props}>
                                 {children}
                             </th>
                         );
                     },
-                    td({ node, children, ...props }) {
+                    td({ children, ...props }: any) {
                         return (
                             <td className="border border-slate-700 px-3 py-2" {...props}>
                                 {children}
@@ -90,24 +90,24 @@ export function MessageRenderer({ content, role, cost, tokens }: MessageRenderer
                         );
                     },
                     // Lists
-                    ul({ node, children, ...props }) {
+                    ul({ children, ...props }: any) {
                         return <ul className="list-disc list-inside my-2 space-y-1" {...props}>{children}</ul>;
                     },
-                    ol({ node, children, ...props }) {
+                    ol({ children, ...props }: any) {
                         return <ol className="list-decimal list-inside my-2 space-y-1" {...props}>{children}</ol>;
                     },
                     // Headings
-                    h1({ node, children, ...props }) {
+                    h1({ children, ...props }: any) {
                         return <h1 className="text-2xl font-bold mt-4 mb-2" {...props}>{children}</h1>;
                     },
-                    h2({ node, children, ...props }) {
+                    h2({ children, ...props }: any) {
                         return <h2 className="text-xl font-bold mt-3 mb-2" {...props}>{children}</h2>;
                     },
-                    h3({ node, children, ...props }) {
+                    h3({ children, ...props }: any) {
                         return <h3 className="text-lg font-semibold mt-2 mb-1" {...props}>{children}</h3>;
                     },
                     // Paragraphs
-                    p({ node, children, ...props }) {
+                    p({ children, ...props }: any) {
                         return <p className="my-2 leading-relaxed" {...props}>{children}</p>;
                     },
                 }}

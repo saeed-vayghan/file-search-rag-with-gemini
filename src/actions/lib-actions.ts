@@ -98,18 +98,16 @@ export const deleteLibraryAction = withAuth(async (user, libraryId: string) => {
         const files = await FileModel.find({ libraryId: library._id, userId: user._id });
         logDebug("DeleteLibrary", `Found ${files.length} files in library ${library.name} (${libraryId})`);
 
-        let deletedCount = 0;
         let failedCount = 0;
 
         for (const file of files) {
             try {
                 const result = await deleteFileInternal(user, file._id.toString());
-                if (result.success) {
-                    deletedCount++;
-                } else {
+                if (!result.success) {
                     failedCount++;
                 }
             } catch (err) {
+                console.error("Library File Delete Exception:", err);
                 failedCount++;
             }
         }

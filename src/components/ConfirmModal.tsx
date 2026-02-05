@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, X } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 interface ConfirmModalProps {
@@ -29,7 +28,6 @@ export function ConfirmModal({
     variant = "destructive",
     isLoading = false,
 }: ConfirmModalProps) {
-    const { dir } = useI18n();
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {

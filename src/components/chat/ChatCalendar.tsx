@@ -12,7 +12,7 @@ interface ChatCalendarProps {
 }
 
 export function ChatCalendar({ onDateSelect }: ChatCalendarProps) {
-    const { t, dir } = useI18n();
+    const { dir } = useI18n();
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 

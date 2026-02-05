@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FolderOpen, Settings, FileText, Search, Database, AlertTriangle, FlaskConical, LogOut, CreditCard } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Settings, Search, Database, AlertTriangle, FlaskConical, LogOut, CreditCard } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useSession, signOut } from "next-auth/react";
+import Image from "next/image";
 import { Button } from "./ui/button";
 
 export function Sidebar() {
@@ -77,9 +78,11 @@ export function Sidebar() {
                     <div className="mt-4 border-t border-border pt-4 space-y-3">
                         <div className="flex items-center gap-3 px-2">
                             {session.user.image ? (
-                                <img
+                                <Image
                                     src={session.user.image}
                                     alt={session.user.name || "User"}
+                                    width={32}
+                                    height={32}
                                     className="h-8 w-8 rounded-full"
                                 />
                             ) : (

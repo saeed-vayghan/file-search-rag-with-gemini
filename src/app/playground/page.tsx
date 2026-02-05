@@ -8,7 +8,7 @@ import { ResultViewer } from "./_components/ResultViewer";
 import { Button } from "@/components/ui/button";
 import { Play, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MESSAGES, LOG_MESSAGES, PATHS } from "@/config/constants";
+import { LOG_MESSAGES } from "@/config/constants";
 
 export default function PlaygroundPage() {
     const [selectedScenario, setSelectedScenario] = useState<PlaygroundScenario>(PLAYGROUND_SCENARIOS[0]);

@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { formatCurrency, formatDate, formatBytes } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { InfoIcon, CoinsIcon, ActivityIcon, SearchIcon, Loader2 } from "lucide-react";
+import { CoinsIcon, ActivityIcon, SearchIcon, Loader2 } from "lucide-react";
 import { getUsageStatsAction } from "@/actions/billing-actions";
 import { toast } from "sonner";
 
@@ -26,6 +25,7 @@ export default function BillingPage() {
                 setStats(res);
             }
         } catch (e) {
+            console.error("Billing Stats Load Error:", e);
             toast.error("Failed to load billing stats");
         } finally {
             setLoading(false);

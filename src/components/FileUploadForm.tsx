@@ -18,7 +18,7 @@ type Library = {
 };
 
 export function FileUploadForm() {
-    const { t, dir } = useI18n();
+    const { t } = useI18n();
     const [status, setStatus] = useState<UploadStatus>("idle");
     const [dragActive, setDragActive] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);

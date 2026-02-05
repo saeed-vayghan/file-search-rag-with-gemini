@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Vazirmatn } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { cn } from "@/lib/utils";
 import { I18nProvider } from "@/lib/i18n";
 
 const inter = Inter({ subsets: ["latin"] });
+const vazirmatn = Vazirmatn({ subsets: ["arabic"], variable: "--font-vazirmatn" });
 
 export const metadata: Metadata = {
   title: "File Search SaaS",
@@ -21,14 +22,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" dir="ltr" className="dark">
-      <head>
-        {/* Vazirmatn font from Google Fonts for Farsi */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet" />
-      </head>
-      <body className={cn(inter.className, "min-h-screen bg-[#050505] text-foreground antialiased")}>
+    <html lang="en" dir="ltr" className={cn("dark", vazirmatn.variable)}>
+      <head />
+      <body className={cn(inter.className, vazirmatn.className, "min-h-screen bg-[#050505] text-foreground antialiased")}>
         <AuthProvider>
           <I18nProvider>
             <ToastProvider>

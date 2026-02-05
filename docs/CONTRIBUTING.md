@@ -158,7 +158,6 @@ Server Actions replace traditional API routes. They are marked with `"use server
 #### **chat-actions.ts**
 - `sendMessageAction()`: Handle chat messages, invoke RAG, save to DB
 - `getChatHistoryAction()`: Load paginated chat history
-- `deleteChatHistoryAction()`: Clear chat history
 
 #### **file-actions.ts** (Purely File Context)
 - `uploadFileAction()`: Upload file to Google File API

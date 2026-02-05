@@ -7,7 +7,7 @@ import { purgeUserDataAction } from "@/actions/file-actions";
 import { AlertTriangle, Trash2, CheckCircle, Loader2 } from "lucide-react";
 
 export default function DangerZonePage() {
-    const { t, dir } = useI18n();
+    const { t } = useI18n();
     const router = useRouter();
 
     const [confirmText, setConfirmText] = useState("");
@@ -35,6 +35,7 @@ export default function DangerZonePage() {
                 setIsDeleting(false);
             }
         } catch (e) {
+            console.error("Purge Error:", e);
             setError(t.dangerZone.errorMessage);
             setIsDeleting(false);
         }

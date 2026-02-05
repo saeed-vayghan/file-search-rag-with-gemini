@@ -9,6 +9,7 @@ import { ArrowLeft, User, Key, Bell, Palette, MessageSquare, CreditCard } from "
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { updateUserAction } from "@/actions/user-actions";
 import { signOut } from "next-auth/react";
@@ -88,7 +89,7 @@ export function SettingsView({ userStats }: SettingsViewProps) {
                         <div className="flex items-center gap-4 mb-4">
                             {/* Avatar Display */}
                             {userStats.image ? (
-                                <img src={userStats.image} alt={userStats.name} className="h-16 w-16 rounded-full border border-slate-700" />
+                                <Image src={userStats.image} alt={userStats.name} width={64} height={64} className="h-16 w-16 rounded-full border border-slate-700" />
                             ) : (
                                 <div className="h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
                                     <User className="h-8 w-8 text-slate-500" />

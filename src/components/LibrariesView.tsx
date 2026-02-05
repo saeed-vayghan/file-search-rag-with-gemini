@@ -53,7 +53,8 @@ export function LibrariesView({ libraries: initialLibraries }: LibraryViewProps)
                     type: "error"
                 });
             }
-        } catch (error) {
+        } catch (err) {
+            console.error("Library Delete Error:", err);
             toast({
                 title: "Error",
                 description: "An unexpected error occurred.",

@@ -215,21 +215,48 @@ export const getFileAction = withAuth(async (user, fileId: string) => {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id }).lean();
         if (!file) return null;
 
-        const f = file as any; // Cast for lean properties
-
         return {
             ...mapFileToUi(file),
             googleUri: (file as any).googleUri, // Additional property for single file view if needed
         };
-    } catch {
+    } catch (error) {
+        console.error(LOG_MESSAGES.FILE.GET_FILES_FAIL, error);
         return null;
     }
 });
 
 
 export const getUserStatsAction = withAuth(async (user) => {
-    const userDoc = await User.findById(user._id);
-    if (!userDoc) {
+    try {
+        const userDoc = await User.findById(user._id);
+        if (!userDoc) {
+            return {
+                name: user.name || "User",
+                totalDocs: 0,
+                storageUsed: "0 KB",
+                storageLimit: "1 GB",
+            };
+        }
+
+        const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
+        const limits = TIERS[userTier];
+
+        const files = await FileModel.find({ userId: user._id });
+        const totalBytes = files.reduce((sum, f) => sum + (f.sizeBytes || 0), 0);
+
+        return {
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            tier: userTier,
+            totalDocs: files.length,
+            storageUsed: formatBytes(totalBytes),
+            storageUsedBytes: totalBytes,
+            storageLimit: formatBytes(limits.maxStoreSizeBytes),
+            storageLimitBytes: limits.maxStoreSizeBytes,
+        };
+    } catch (error) {
+        console.error(LOG_MESSAGES.USER.FETCH_SETTINGS_FAIL, error);
         return {
             name: user.name || "User",
             totalDocs: 0,
@@ -237,24 +264,6 @@ export const getUserStatsAction = withAuth(async (user) => {
             storageLimit: "1 GB",
         };
     }
-
-    const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
-    const limits = TIERS[userTier];
-
-    const files = await FileModel.find({ userId: user._id });
-    const totalBytes = files.reduce((sum, f) => sum + (f.sizeBytes || 0), 0);
-
-    return {
-        name: user.name,
-        email: user.email,
-        image: user.image,
-        tier: userTier,
-        totalDocs: files.length,
-        storageUsed: formatBytes(totalBytes),
-        storageUsedBytes: totalBytes,
-        storageLimit: formatBytes(limits.maxStoreSizeBytes),
-        storageLimitBytes: limits.maxStoreSizeBytes,
-    };
 });
 
 
@@ -328,7 +337,8 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
                 indexingTokens: file.indexingTokens
             }
         };
-    } catch (_error) {
+    } catch (error) {
+        console.error(LOG_MESSAGES.GOOGLE.INSPECT_FAIL, error);
         return { error: MESSAGES.ERRORS.INSPECT_REMOTE_FAILED };
     }
 });

@@ -3,11 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EditLibraryModal } from "./EditLibraryModal";
-import { ArrowLeft, FileText, Search, Plus, MessageSquare, Pencil } from "lucide-react";
+import { ArrowLeft, FileText, Search, MessageSquare, Pencil } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 
@@ -39,7 +38,6 @@ import { formatCurrency } from "@/lib/utils";
 
 export function LibraryDetailsView({ library, initialFiles }: LibraryDetailsViewProps) {
     const { t, dir } = useI18n();
-    const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 

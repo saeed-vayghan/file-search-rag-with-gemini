@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Database, FileText, FolderOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Database, FileText, FolderOpen, ChevronLeft, ChevronRight, Check, Lock, Zap } from "lucide-react";
 import Link from "next/link";
 import { cn, formatCurrency } from "@/lib/utils";
 import { FileUploadForm } from "@/components/FileUploadForm";
@@ -12,32 +12,77 @@ import { FileActionsMenu } from "@/components/FileActionsMenu";
 import { useI18n } from "@/lib/i18n";
 import { TIERS, TierKey } from "@/config/limits";
 import { FILE_STATUS, UI_DEFAULTS, PATHS, FileStatusType as FileStatus } from "@/config/constants";
-import { Check, Lock, Zap } from "lucide-react";
-
 
 interface DashboardFile {
     id: string;
     displayName: string;
-    mimeType: string;
     type: string;
-    sizeBytes: number;
     size: string;
     status: string;
     date: string;
+    mimeType: string;
+    indexingCost?: number;
+    libraryId?: string;
     libraryName?: string;
     libraryIcon?: string;
-    libraryId?: string;
-    indexingCost?: number;
+}
+
+interface DashboardLibrary {
+    id: string;
+    name: string;
+    icon: string;
+    color: string;
+    count: number;
 }
 
 interface DashboardViewProps {
     files: DashboardFile[];
-    userStats: any;
-    libraries: any[];
+    userStats: {
+        totalFiles: number;
+        totalLibraries: number;
+        totalStorage: string;
+        storageUsed: string;
+        storageLimit: string;
+        storageUsedBytes: number;
+        storageLimitBytes: number;
+        tier: string;
+    };
+    libraries: DashboardLibrary[];
 }
 
 const LIBRARIES_PER_PAGE = 3;
 const FILES_PER_PAGE = 10;
+
+// Helper component for file status badges
+const StatusBadge = ({ status }: { status: FileStatus }) => {
+    const { t } = useI18n();
+    let variant: "default" | "secondary" | "destructive" | "outline" | null | undefined = "secondary";
+    let text = "Unknown";
+
+    switch (status) {
+        case FILE_STATUS.UPLOADING:
+            variant = "secondary";
+            text = t.upload?.uploading || "Uploading...";
+            break;
+        case FILE_STATUS.INGESTING:
+            variant = "default";
+            text = t.chat?.processing || "Processing...";
+            break;
+        case FILE_STATUS.ACTIVE:
+            variant = "default";
+            text = t.chat?.readyForSearch || "Ready";
+            break;
+        case FILE_STATUS.FAILED:
+            variant = "destructive";
+            text = t.upload?.failed || "Failed";
+            break;
+        default:
+            variant = "secondary";
+            text = "Unknown";
+    }
+
+    return <Badge variant={variant}>{text}</Badge>;
+};
 
 export function DashboardView({ files, userStats, libraries }: DashboardViewProps) {
     const { t, dir } = useI18n();
@@ -63,9 +108,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
             {/* Header */}
             <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/40 bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="cursor-pointer">{t.nav.dashboard}</span>
-                    <span>/</span>
-                    <span className="font-medium text-foreground">{t.dashboard.totalDocs}</span>
+                    <span className="cursor-pointer font-medium text-foreground">{t.nav.dashboard}</span>
                 </div>
             </header>
 
@@ -103,20 +146,19 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                         <CardContent>
                             <div className="text-2xl font-bold">{TIERS[userStats.tier as TierKey]?.label || "Professional"}</div>
                             <p className="text-xs text-muted-foreground mt-2">
-                                Tier 1 Active
+                                {TIERS[userStats.tier as TierKey]?.name || "Tier 1"} Active
                             </p>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Tier Management */}
+                {/* Subscription Tiers */}
                 <div className="space-y-4">
                     <h3 className="text-lg font-medium">Subscription Tiers</h3>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         {(Object.keys(TIERS) as TierKey[]).map((key) => {
                             const tier = TIERS[key];
-                            const isActive = key === "TIER_1"; // Mocking Tier 1 as active
-                            const isHigher = key === "TIER_2" || key === "TIER_3";
+                            const isActive = key === userStats.tier;
 
                             return (
                                 <Card key={key} className={cn(
@@ -185,7 +227,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                         <>
                             <div className="grid gap-4 md:grid-cols-3">
                                 {currentLibraries.map((lib) => (
-                                    <Link key={lib.id} href={`/libraries/${lib.id}`} className="block">
+                                    <Link key={lib.id} href={`${PATHS.LIBRARIES}/${lib.id}`} className="block">
                                         <Card className="hover:border-purple-500/50 transition-colors cursor-pointer group h-full">
                                             <CardHeader className="flex flex-row items-center justify-between pb-2">
                                                 <CardTitle className="text-md font-medium group-hover:text-purple-500 transition-colors">{lib.name}</CardTitle>
@@ -193,9 +235,6 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="text-2xl font-bold">{lib.count} <span className="text-xs font-normal text-muted-foreground">{t.libraries.documents}</span></div>
-                                                <div className={cn("text-xs mt-1", lib.color)}>
-                                                    {t.dashboard.status}
-                                                </div>
                                             </CardContent>
                                         </Card>
                                     </Link>
@@ -233,13 +272,13 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                 </div>
 
                 {/* Upload Section */}
-                < div id="upload-section" className="space-y-2 scroll-mt-24" >
+                <div id="upload-section" className="space-y-2 scroll-mt-24">
                     <h3 className="text-lg font-medium">{t.upload.title}</h3>
                     <FileUploadForm />
-                </div >
+                </div>
 
                 {/* Recent Files Table */}
-                < div className="space-y-4" >
+                <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium">{t.dashboard.recentFiles}</h3>
                         <Link href={PATHS.SEARCH}>
@@ -283,7 +322,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                                             </td>
                                             <td className="p-4 text-muted-foreground">
                                                 {file.libraryId ? (
-                                                    <Link href={`/libraries/${file.libraryId}`} className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
+                                                    <Link href={`${PATHS.LIBRARIES}/${file.libraryId}`} className="flex items-center gap-1.5 hover:text-blue-400 transition-colors">
                                                         <span>{file.libraryIcon}</span>
                                                         <span>{file.libraryName}</span>
                                                     </Link>
@@ -339,22 +378,8 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                             </Button>
                         </div>
                     )}
-                </div >
-            </div >
-        </div >
+                </div>
+            </div>
+        </div>
     );
-}
-
-function StatusBadge({ status }: { status: FileStatus }) {
-    switch (status) {
-        case FILE_STATUS.ACTIVE:
-            return <Badge variant="success">Active</Badge>;
-        case FILE_STATUS.INGESTING:
-        case FILE_STATUS.UPLOADING:
-            return <Badge variant="warning">Processing</Badge>;
-        case FILE_STATUS.FAILED:
-            return <Badge variant="destructive">Failed</Badge>;
-        default:
-            return <Badge variant="secondary">{status}</Badge>;
-    }
 }

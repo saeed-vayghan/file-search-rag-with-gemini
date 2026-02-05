@@ -14,7 +14,7 @@ import { useToast } from "@/lib/toast";
 import { LOG_MESSAGES, MESSAGES } from "@/config/constants";
 
 export default function ChatRulesPage() {
-    const { t, dir } = useI18n();
+    const { dir } = useI18n();
     const { toast } = useToast();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
