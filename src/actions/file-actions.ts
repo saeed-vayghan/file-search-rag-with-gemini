@@ -79,7 +79,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
 
         // 3. Prepare Environment
         const libraryId = await resolveLibraryId(user, rawLibraryId);
-        let store = await ensureUserStore(user);
+        const store = await ensureUserStore(user);
 
         const capacityCheck = validateStoreCapacity(store.sizeBytes, file.size, limits);
         if (!capacityCheck.valid) {
@@ -197,9 +197,9 @@ export const getFilesAction = withAuth(async (user, libraryId?: string): Promise
         }
 
         return {
-            files: files.map(f => ({
-                ...mapFileToUi(f),
-                indexingCost: f.indexingCost
+            files: files.map(_f => ({
+                ...mapFileToUi(_f as any),
+                indexingCost: (_f as any).indexingCost
             })),
             library: libraryData || undefined
         };
@@ -328,7 +328,7 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
                 indexingTokens: file.indexingTokens
             }
         };
-    } catch (error) {
+    } catch (_error) {
         return { error: MESSAGES.ERRORS.INSPECT_REMOTE_FAILED };
     }
 });
