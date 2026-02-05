@@ -1,5 +1,8 @@
 import { ChatScopeType } from "@/config/constants";
 
+// new Tools: Mermaid / Diagram
+
+
 /**
  * Pure function to construct a metadata filter for Google AI based on search scope.
  */

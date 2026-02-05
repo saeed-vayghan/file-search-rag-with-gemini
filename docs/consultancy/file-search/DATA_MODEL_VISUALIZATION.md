@@ -11,8 +11,8 @@ We use a strict **Library Metaphor** to make the system intuitive for users.
 
 | SaaS Concept | Real World Metaphor | Technical Implementation |
 | :--- | :--- | :--- |
-| **User** | **The Library** | Holds the keys to the building. One User = One Google Vector Store. |
-| **Collection** | **The Shelf** | A way to group books. Purely organizational (Virtual Tag). |
+| **User** | **The Patron** | Holds the account. One User = One formal `Store` record. |
+| **Library** | **The Wing** | A specialized room for books. Grouping logic for files. |
 | **File** | **The Book** | The actual knowledge source. Indexed by AI for search. |
 
 ---
@@ -31,31 +31,44 @@ Imagine looking inside the database for a user named **Saeed**.
   "name": "Saeed",
   "email": "saeed@example.com",
   "image": "https://avatar.com/saeed.png",
+  "tier": "TIER_1",
   
-  // 🔑 THE MASTER KEY
-  // This ID links the user to their isolated vector space in Google Cloud.
-  "googleStoreId": "fileSearchStores/store-saeed-uid-123" 
+  // 🔗 LINK TO STORE
+  // Instead of a direct ID, we link to a formal Store record
+  "primaryStoreId": "store_saeed_001" 
+}
+
+// Collection: stores
+{
+  "_id": "store_saeed_001",
+  "userId": "user_saeed_001",
+  "googleStoreId": "fileSearchStores/store-saeed-uid-123",
+  "displayName": "store-saeed@example.com",
+  "fileCount": 42,
+  "sizeBytes": 104857600,
+  "status": "ACTIVE"
 }
 ```
 
-### 📚 The Shelves (Collections)
-*Virtual folders. A book can sit on a shelf, but the shelf is just a label.*
+### 🏛️ The Wings (Libraries)
+*Logical groupings. A book belongs to one library wing.*
 
 ```json
-// Collection: collections
+// Collection: libraries
 [
   {
-    "_id": "col_finance_2024",
+    "_id": "lib_finance_2024",
     "userId": "user_saeed_001",
     "name": "Financials",
-    "color": "#FF5733", // 🟧 Orange Shelf
+    "description": "Annual reports and tax filings",
+    "color": "#FF5733", // 🟧 Orange Wing
     "icon": "💰"
   },
   {
-    "_id": "col_research_ai",
+    "_id": "lib_research_ai",
     "userId": "user_saeed_001",
     "name": "AI Research",
-    "color": "#33C1FF", // 🟦 Blue Shelf
+    "color": "#33C1FF", // 🟦 Blue Wing
     "icon": "🤖"
   }
 ]
@@ -67,11 +80,11 @@ Imagine looking inside the database for a user named **Saeed**.
 ```json
 // Collection: files
 [
-  // 📘 BOOK 1: A Tax Contract (On the 'Financials' Shelf)
+  // 📘 BOOK 1: A Tax Contract (In the 'Financials' Wing)
   {
     "_id": "file_contract_001",
     "userId": "user_saeed_001",
-    "collectionId": "col_finance_2024", // <--- Sitting on the Orange Shelf
+    "libraryId": "lib_finance_2024", // <--- Located in the Orange Wing
     "displayName": "Contract_2024.pdf",
     "mimeType": "application/pdf",
     "sizeBytes": 102400,
@@ -80,7 +93,11 @@ Imagine looking inside the database for a user named **Saeed**.
     // ☁️ GLOBAL CLOUD REFERENCES
     "googleFileId": "files/abc-123-contract",
     "googleUri": "https://generativelanguage.../files/abc-123",
-    "googleOperationName": "operations/op-ingest-123", /* Log for debugging */
+    "googleOperationName": "operations/op-ingest-123",
+    
+    // 🛠️ MODERN ADDITIONS
+    "contentHash": "sha256_hash_abc_123", /* Deduplication */
+    "localPath": "/uploads/saeed_001/file_contract_001_Contract_2024.pdf", /* Preview */
     
     "createdAt": "2026-01-25T10:00:00Z"
   }
@@ -99,12 +116,12 @@ When you ask a question, the AI acts as the Librarian.
 *   **Logic**: The Librarian looks through **ALL** books in `store-saeed-uid-123`.
 *   **Scope**: Entire Library.
 
-### Scenario B: "Search a Collection"
+### Scenario B: "Search a Library"
 > *"What are the payment terms in this contract?"* (while viewing Financials)
 
 *   **Logic**: The Librarian puts on "blinders" and **ONLY** looks at books verifying:
-    *   `customMetadata.collectionId == "col_finance_2024"`
-*   **Scope**: Only the Orange Shelf.
+    *   `customMetadata.library_id == "lib_finance_2024"`
+*   **Scope**: Only the Orange Wing.
 
 ---
 
