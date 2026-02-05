@@ -46,7 +46,8 @@ Imagine looking inside the database for a user named **Saeed**.
   "displayName": "store-saeed@example.com",
   "fileCount": 42,
   "sizeBytes": 104857600,
-  "status": "ACTIVE"
+  "status": "ACTIVE",
+  "lastSyncedAt": "2026-02-01T12:00:00Z"
 }
 ```
 

@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { CopyButton } from "@/components/chat/CopyButton";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { queryModels } from "@/config/gemini-models";
 
 type FileInfo = {
     id: string;
@@ -38,6 +40,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     const [hasMore, setHasMore] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [chatMode, setChatMode] = useState<"limited" | "auxiliary">("limited");
+    const [chatModel, setChatModel] = useState<string>(queryModels[1].model); // Default to Flash Preview
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -131,7 +134,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         setIsLoading(true);
 
         try {
-            const result = await sendMessageAction(fileId, "file", messages, input, chatMode);
+            const result = await sendMessageAction(fileId, "file", messages, input, chatMode, chatModel);
 
             if (!("reply" in result) || !result.reply) {
                 // Auth failure or complete error
@@ -174,7 +177,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     <ArrowLeft className={cn("h-4 w-4", dir === "rtl" && "rotate-180")} />
                 </Link>
                 <div className="h-6 w-px bg-border mx-2" />
-                <div className="flex items-center gap-2">
+
+                {/* File Info */}
+                <div className="flex items-center gap-2 mr-auto">
                     <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center text-blue-500">
                         <FileText className="h-4 w-4" />
                     </div>
@@ -187,7 +192,8 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                         </span>
                     </div>
                 </div>
-                <div className="ml-auto flex items-center gap-2">
+
+                <div className="flex items-center gap-2">
                     <ChatCalendar onDateSelect={handleDateSelect} />
                     <Button variant="ghost" size="icon" onClick={() => setIsDeleteModalOpen(true)}>
                         <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-400 transition-colors" />
@@ -427,7 +433,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     {/* Input Area */}
                     <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-slate-950">
                         {/* Mode Selector */}
-                        <div className="max-w-3xl mx-auto mb-2 flex justify-end">
+                        <div className="max-w-3xl mx-auto mb-2 flex justify-end gap-2 items-center">
+                            <div className="w-[180px]">
+                                <ModelSelector
+                                    label=""
+                                    models={queryModels}
+                                    selectedModel={chatModel}
+                                    onSelect={setChatModel}
+                                    hintKey="query_hint"
+                                    className="space-y-0"
+                                />
+                            </div>
                             <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
                                 <button
                                     type="button"

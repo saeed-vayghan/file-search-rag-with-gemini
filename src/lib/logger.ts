@@ -9,6 +9,7 @@ interface ChatRequestLog {
     scope: "file" | "library" | "global";
     contextId: string;
     chatMode: "limited" | "auxiliary";
+    modelName?: string;
     userMessage: string;
     systemInstruction?: string;
 }
@@ -55,6 +56,9 @@ export function logChatRequest(data: ChatRequestLog): void {
     console.log(`Scope: ${data.scope}`);
     console.log(`Context ID: ${data.contextId}`);
     console.log(`Chat Mode: ${data.chatMode.toUpperCase()}`);
+    if (data.modelName) {
+        console.log(`Model: ${data.modelName}`);
+    }
     console.log(`User Message: "${data.userMessage}"`);
     if (data.systemInstruction) {
         console.log(`System Instruction: ${data.systemInstruction}`);

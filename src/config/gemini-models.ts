@@ -1,25 +1,3 @@
-
-export const indexingModels = [
-    {
-        "model": "gemini-3-pro-preview",
-        "indexing_hint": "Best for high-stakes enterprise libraries where you need the most sophisticated indexing metadata and future-proof compatibility with agentic reasoning."
-    },
-    {
-        "model": "gemini-3-flash-preview",
-        "indexing_hint": "The optimal balance for modern RAG; provides 'Pro-grade' extraction for complex documents (handwriting/OCR) at a much faster processing speed."
-    },
-    {
-        "model": "gemini-2.5-pro",
-        "indexing_hint": "Choose this if your existing pipeline is built on the 2.5 architecture and requires high-fidelity parsing of massive, multi-modal legacy datasets."
-    },
-    {
-        "model": "gemini-2.5-flash-lite",
-        "indexing_hint": "Most cost-efficient entry point for indexing simple text-heavy libraries (markdown, txt) where document structure is straightforward."
-    }
-]
-
-
-
 export const queryModels = [
     {
         "model": "gemini-3-pro-preview",

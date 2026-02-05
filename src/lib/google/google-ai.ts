@@ -12,8 +12,6 @@ if (!process.env.GOOGLE_API_KEY) {
 
 let globalAiClient: GoogleGenAI | null = null;
 
-const MODEL_NAME = "gemini-3-flash-preview";
-
 
 export function getAIClient(): GoogleGenAI {
     if (!globalAiClient) {
@@ -138,12 +136,13 @@ export async function search(
     storeName: string,
     query: string,
     scope?: { type: 'global' | 'library' | 'file', id?: string },
-    systemInstruction?: string
+    systemInstruction?: string,
+    modelName: string = "gemini-3-flash-preview"
 ) {
     const aiClient = getAIClient();
     try {
         const response = await aiClient.models.generateContent({
-            model: MODEL_NAME,
+            model: modelName,
             contents: query,
             config: {
                 systemInstruction: systemInstruction,

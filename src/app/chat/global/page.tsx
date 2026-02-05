@@ -14,6 +14,8 @@ import { DateSeparator } from "@/components/chat/DateSeparator";
 import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
 import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { CopyButton } from "@/components/chat/CopyButton";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { queryModels } from "@/config/gemini-models";
 
 export default function GlobalChatPage() {
     const { t, dir } = useI18n();
@@ -24,6 +26,7 @@ export default function GlobalChatPage() {
     const [hasMore, setHasMore] = useState(true);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [chatMode, setChatMode] = useState<"limited" | "auxiliary">("limited");
+    const [chatModel, setChatModel] = useState<string>(queryModels[1].model); // Default to Flash Preview
 
     // Scope Selector State
     const [isScopeOpen, setIsScopeOpen] = useState(false);
@@ -113,7 +116,7 @@ export default function GlobalChatPage() {
         setIsLoading(true);
 
         try {
-            const result = await sendMessageAction("global", "global", messages, input, chatMode);
+            const result = await sendMessageAction("global", "global", messages, input, chatMode, chatModel);
 
             if (!("reply" in result) || !result.reply) {
                 // Auth failure or complete error
@@ -234,12 +237,13 @@ export default function GlobalChatPage() {
                     )}
                 </div>
 
-                <div className="ml-auto">
+
+                <div className="ml-auto flex items-center gap-2">
                     <Button variant="ghost" size="icon" onClick={() => setIsDeleteModalOpen(true)}>
                         <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-400 transition-colors" />
                     </Button>
                 </div>
-            </header>
+            </header >
 
             <div className="flex-1 flex overflow-hidden">
                 <div className="flex-1 flex flex-col bg-slate-950 relative">
@@ -332,7 +336,17 @@ export default function GlobalChatPage() {
                     {/* Input Area */}
                     <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-slate-950">
                         {/* Mode Selector */}
-                        <div className="max-w-3xl mx-auto mb-2 flex justify-end">
+                        <div className="max-w-3xl mx-auto mb-2 flex justify-end gap-2 items-center">
+                            <div className="w-[180px]">
+                                <ModelSelector
+                                    label=""
+                                    models={queryModels}
+                                    selectedModel={chatModel}
+                                    onSelect={setChatModel}
+                                    hintKey="query_hint"
+                                    className="space-y-0"
+                                />
+                            </div>
                             <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
                                 <button
                                     type="button"
@@ -402,6 +416,6 @@ export default function GlobalChatPage() {
                 onClose={() => setIsDeleteModalOpen(false)}
                 onDeleted={() => setMessages([])}
             />
-        </div>
+        </div >
     );
 }

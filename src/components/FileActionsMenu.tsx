@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { checkFileStatusAction, deleteFileAction } from "@/actions/file-actions";
@@ -19,13 +19,34 @@ interface FileActionsMenuProps {
 
 export function FileActionsMenu({ fileId, fileName }: FileActionsMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState<"bottom" | "top">("bottom");
     const [isLoading, setIsLoading] = useState(false);
     const [isInspectOpen, setIsInspectOpen] = useState(false);
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
     const router = useRouter();
     const { t, dir } = useI18n();
     const { toast } = useToast();
+
+    // Smart positioning logic
+    useEffect(() => {
+        if (isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            // const spaceAbove = rect.top; // Not strictly needed if we just check spaceBelow
+            const menuHeight = 180; // Approximate menu height
+
+            // If not enough space below, force top
+            if (spaceBelow < menuHeight) {
+                setMenuPosition("top");
+            } else {
+                setMenuPosition("bottom");
+            }
+        }
+    }, [isOpen]);
 
     const handleCheckStatus = async () => {
         setIsLoading(true);
@@ -100,8 +121,9 @@ export function FileActionsMenu({ fileId, fileName }: FileActionsMenuProps) {
     };
 
     return (
-        <div className="relative">
+        <div className="relative" ref={menuRef}>
             <Button
+                ref={buttonRef}
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
@@ -122,8 +144,9 @@ export function FileActionsMenu({ fileId, fileName }: FileActionsMenuProps) {
                         onClick={() => setIsOpen(false)}
                     />
                     <div className={cn(
-                        "absolute top-full mt-1 z-50 w-48 rounded-md border border-slate-800 bg-slate-900 shadow-lg",
-                        dir === "rtl" ? "left-0" : "right-0" // RTL dropdown position
+                        "absolute z-50 w-48 rounded-md border border-slate-800 bg-slate-900 shadow-lg animate-in fade-in zoom-in-95 duration-100",
+                        dir === "rtl" ? "left-0" : "right-0", // RTL dropdown alignment
+                        menuPosition === "bottom" ? "top-full mt-1" : "bottom-full mb-1" // Vertical positioning
                     )}>
                         <div className="py-1">
                             <button

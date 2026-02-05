@@ -20,6 +20,10 @@ export interface IFile extends Document {
     // Local storage for preview
     localPath?: string;
 
+    // Deduplication
+    contentHash?: string;
+
+    createdAt: Date;
     updatedAt: Date;
 }
 
@@ -40,7 +44,6 @@ const FileSchema: Schema<IFile> = new Schema(
         googleOperationName: { type: String },
         localPath: { type: String },
         contentHash: { type: String, required: false, index: true },
-        indexingModel: { type: String },
     },
     { timestamps: true }
 );

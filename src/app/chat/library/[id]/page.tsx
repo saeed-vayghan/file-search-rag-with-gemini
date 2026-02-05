@@ -13,6 +13,8 @@ import { useI18n } from "@/lib/i18n";
 import { DateSeparator } from "@/components/chat/DateSeparator";
 import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { CopyButton } from "@/components/chat/CopyButton";
+import { ModelSelector } from "@/components/ui/model-selector";
+import { queryModels } from "@/config/gemini-models";
 
 export default function LibraryChatPage({ params }: { params: Promise<{ id: string }> }) {
     const { t, dir } = useI18n();
@@ -24,6 +26,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [libraryInfo, setLibraryInfo] = useState<{ name: string } | null>(null);
     const [chatMode, setChatMode] = useState<"limited" | "auxiliary">("limited");
+    const [chatModel, setChatModel] = useState<string>(queryModels[1].model); // Default to Flash Preview
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -100,7 +103,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
         setIsLoading(true);
 
         try {
-            const result = await sendMessageAction(libraryId, "library", messages, input, chatMode);
+            const result = await sendMessageAction(libraryId, "library", messages, input, chatMode, chatModel);
 
             if (!("reply" in result) || !result.reply) {
                 // Auth failure or complete error  
@@ -151,7 +154,7 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
                         <span className="text-[10px] text-slate-500">Chat with files in this library</span>
                     </div>
                 </div>
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
                     <Button variant="ghost" size="icon" onClick={() => setIsDeleteModalOpen(true)}>
                         <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-400 transition-colors" />
                     </Button>
@@ -249,7 +252,17 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
                     {/* Input Area */}
                     <form onSubmit={handleSubmit} className="p-4 border-t border-border bg-slate-950">
                         {/* Mode Selector */}
-                        <div className="max-w-3xl mx-auto mb-2 flex justify-end">
+                        <div className="max-w-3xl mx-auto mb-2 flex justify-end gap-2 items-center">
+                            <div className="w-[180px]">
+                                <ModelSelector
+                                    label=""
+                                    models={queryModels}
+                                    selectedModel={chatModel}
+                                    onSelect={setChatModel}
+                                    hintKey="query_hint"
+                                    className="space-y-0"
+                                />
+                            </div>
                             <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
                                 <button
                                     type="button"

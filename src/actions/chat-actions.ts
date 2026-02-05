@@ -103,7 +103,8 @@ export const sendMessageAction = withAuth(async (
     scope: ChatScopeType,
     history: ChatMessage[],
     newMessage: string,
-    mode?: ChatModeType
+    mode?: ChatModeType,
+    modelName?: string
 ): Promise<{ reply: string; citations?: any[]; error?: string }> => {
     try {
         // 1. Validate Store
@@ -113,7 +114,7 @@ export const sendMessageAction = withAuth(async (
         const requestedMode = mode || (user.settings?.defaultMode || CHAT_MODES.LIMITED) as ChatModeType;
         const systemInstruction = resolveSystemInstruction(user.settings, requestedMode);
 
-        logChatRequest({ scope, contextId, chatMode: requestedMode, userMessage: newMessage, systemInstruction });
+        logChatRequest({ scope, contextId, chatMode: requestedMode, modelName, userMessage: newMessage, systemInstruction });
 
         // 3. Save User Message
         await persistMessage({
@@ -130,7 +131,8 @@ export const sendMessageAction = withAuth(async (
             googleStoreId,
             newMessage,
             { type: scope, id: contextId },
-            systemInstruction
+            systemInstruction,
+            modelName
         );
         const replyText = result.text || MESSAGES.INFO.NO_RELEVANT_INFO;
 
