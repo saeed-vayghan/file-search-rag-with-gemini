@@ -11,7 +11,7 @@ if (!process.env.GOOGLE_API_KEY) {
 
 let globalAiClient: GoogleGenAI | null = null;
 
-const MODEL_NAME = "gemini-3-flash-preview"; // Must match PoC - supports File Search tool
+const MODEL_NAME = "gemini-3-flash-preview";
 
 
 export function getAIClient(): GoogleGenAI {
