@@ -14,7 +14,19 @@ export default async function DashboardPage() {
   ]);
 
   const files = ("error" in filesResult) ? [] : filesResult.files;
-  const userStats = ("error" in userStatsResult) ? { name: "Guest", totalDocs: 0, storageUsed: "0 KB", storageLimit: "1 GB" } : userStatsResult;
+  const userStats = ("error" in userStatsResult)
+    ? {
+      name: "Guest",
+      totalFiles: 0,
+      totalLibraries: 0,
+      totalStorage: "1 GB",
+      storageUsed: "0 KB",
+      storageLimit: "1 GB",
+      storageUsedBytes: 0,
+      storageLimitBytes: 1024 * 1024 * 1024,
+      tier: "free"
+    }
+    : userStatsResult;
   const libraries = ("error" in librariesResult) ? [] : librariesResult;
 
   return <DashboardView files={files} userStats={userStats} libraries={libraries} />;

@@ -229,19 +229,15 @@ export const getFileAction = withAuth(async (user, fileId: string) => {
 export const getUserStatsAction = withAuth(async (user) => {
     try {
         const userDoc = await User.findById(user._id);
-        if (!userDoc) {
-            return {
-                name: user.name || "User",
-                totalDocs: 0,
-                storageUsed: "0 KB",
-                storageLimit: "1 GB",
-            };
-        }
-
-        const userTier = (userDoc.tier || DEFAULT_TIER) as TierKey;
+        const userTier = (userDoc?.tier || DEFAULT_TIER) as TierKey;
         const limits = TIERS[userTier];
 
-        const files = await FileModel.find({ userId: user._id });
+        const [filesCount, librariesCount, files] = await Promise.all([
+            FileModel.countDocuments({ userId: user._id }),
+            Library.countDocuments({ userId: user._id }),
+            FileModel.find({ userId: user._id }, { sizeBytes: 1 })
+        ]);
+
         const totalBytes = files.reduce((sum, f) => sum + (f.sizeBytes || 0), 0);
 
         return {
@@ -249,7 +245,9 @@ export const getUserStatsAction = withAuth(async (user) => {
             email: user.email,
             image: user.image,
             tier: userTier,
-            totalDocs: files.length,
+            totalFiles: filesCount,
+            totalLibraries: librariesCount,
+            totalStorage: formatBytes(limits.maxStoreSizeBytes),
             storageUsed: formatBytes(totalBytes),
             storageUsedBytes: totalBytes,
             storageLimit: formatBytes(limits.maxStoreSizeBytes),
@@ -259,9 +257,14 @@ export const getUserStatsAction = withAuth(async (user) => {
         console.error(LOG_MESSAGES.USER.FETCH_SETTINGS_FAIL, error);
         return {
             name: user.name || "User",
-            totalDocs: 0,
+            tier: DEFAULT_TIER,
+            totalFiles: 0,
+            totalLibraries: 0,
+            totalStorage: "1 GB",
             storageUsed: "0 KB",
+            storageUsedBytes: 0,
             storageLimit: "1 GB",
+            storageLimitBytes: 1024 * 1024 * 1024,
         };
     }
 });
