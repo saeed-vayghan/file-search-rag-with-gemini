@@ -19,6 +19,9 @@ export interface IUsageLog extends Document {
     meta: {
         searchCount?: number;
         operationName?: string;
+        fileName?: string;
+        fileSize?: number;
+        charCount?: number;
     };
     contextId?: string; // fileId or chatId
     createdAt: Date;
@@ -44,6 +47,9 @@ const UsageLogSchema = new Schema<IUsageLog>(
         meta: {
             searchCount: { type: Number },
             operationName: { type: String },
+            fileName: { type: String },
+            fileSize: { type: Number },
+            charCount: { type: Number },
         },
         contextId: { type: String },
     },

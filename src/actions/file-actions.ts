@@ -111,9 +111,16 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         const operation = await importFileWithRetry(
             store,
             uploadRes.name,
+            uploadRes.uri,
+            file.type,
             { libraryId, dbFileId: newFileId! },
-            user
+            user,
+            file.name,
+            file.size
         );
+
+        // 7.5. Non-blocking Grace Period (requested: just wait for 2 seconds and let it go)
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         // 8. Local Preview Storage
         const { relativePath, absolutePath } = generateLocalFilePath(

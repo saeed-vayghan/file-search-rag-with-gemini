@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Database, FileText, FolderOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { FileUploadForm } from "@/components/FileUploadForm";
 import { FileActionsMenu } from "@/components/FileActionsMenu";
 import { useI18n } from "@/lib/i18n";
@@ -298,7 +298,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                                             <td className="p-4 text-muted-foreground">{file.date}</td>
                                             <td className="p-4 text-muted-foreground">{file.size}</td>
                                             <td className="p-4 text-muted-foreground font-mono text-xs">
-                                                {file.indexingCost ? `$${file.indexingCost.toFixed(5)}` : '-'}
+                                                {file.indexingCost ? formatCurrency(file.indexingCost, 6) : '-'}
                                             </td>
                                             <td className="p-4">
                                                 <StatusBadge status={file.status as FileStatus} />

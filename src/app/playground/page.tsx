@@ -113,15 +113,15 @@ export default function PlaygroundPage() {
                     </div>
                 </div>
 
-                {/* Split Pane: Editor | Result */}
-                <div className="flex-1 flex min-h-0">
+                {/* Split Pane: Editor (Top) | Result (Bottom) */}
+                <div className="flex-1 flex flex-col min-h-0">
                     {/* Editor (50%) */}
-                    <div className="flex-1 min-w-0 border-r border-slate-800">
+                    <div className="flex-1 min-h-0 border-b border-slate-800">
                         <CodeEditor code={code} onChange={(val) => setCode(val || "")} />
                     </div>
 
                     {/* Result (50%) */}
-                    <div className="flex-1 min-w-0 bg-slate-900">
+                    <div className="flex-1 min-h-0 bg-slate-900 overflow-hidden">
                         <ResultViewer result={result} isLoading={isRunning} />
                     </div>
                 </div>

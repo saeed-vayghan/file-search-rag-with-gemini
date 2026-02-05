@@ -21,7 +21,7 @@ export async function calculateSHA256(file: File): Promise<string> {
     return hashHex;
 }
 
-export function formatCurrency(amount: number, decimals: number = 4): string {
+export function formatCurrency(amount: number, decimals: number = 6): string {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',

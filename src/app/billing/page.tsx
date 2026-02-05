@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatBytes } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -97,50 +97,103 @@ export default function BillingPage() {
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Usage History</CardTitle>
-                    <CardDescription>
-                        Recent API interactions and their calculated costs.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <ScrollArea className="h-[400px]">
-                        <div className="w-full overflow-auto">
-                            <table className="w-full caption-bottom text-sm text-left">
-                                <thead className="[&_tr]:border-b">
-                                    <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Date</th>
-                                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Type</th>
-                                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Model</th>
-                                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground">Tokens (In/Out/Total)</th>
-                                        <th className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Cost</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="[&_tr:last-child]:border-0">
-                                    {stats.logs.map((log: any) => (
-                                        <tr key={log._id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                            <td className="p-4 align-middle">{formatDate(log.createdAt)}</td>
-                                            <td className="p-4 align-middle">
-                                                <Badge variant={log.type === 'indexing' ? 'secondary' : 'default'}>
-                                                    {log.type}
-                                                </Badge>
-                                            </td>
-                                            <td className="p-4 align-middle font-mono text-xs">{log.modelName}</td>
-                                            <td className="p-4 align-middle font-mono text-xs">
-                                                {log.tokens.input} / {log.tokens.output} / {log.tokens.total}
-                                            </td>
-                                            <td className="p-4 align-middle text-right font-mono text-xs">
-                                                {formatCurrency(log.totalCost, 6)}
-                                            </td>
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card className="flex flex-col">
+                    <CardHeader>
+                        <CardTitle>Indexing History</CardTitle>
+                        <CardDescription>
+                            One-time file ingestion costs.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <ScrollArea className="h-[400px]">
+                            <div className="w-full">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="border-b">
+                                        <tr className="text-muted-foreground">
+                                            <th className="h-10 px-2 font-medium">File / Date</th>
+                                            <th className="h-10 px-2 font-medium">Tokens</th>
+                                            <th className="h-10 px-2 font-medium text-right">Cost</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {stats.logs.filter((l: any) => l.type === 'indexing').map((log: any) => (
+                                            <tr key={log._id} className="hover:bg-muted/50">
+                                                <td className="p-2">
+                                                    <div className="font-medium truncate max-w-[200px]" title={log.meta?.fileName}>
+                                                        {log.meta?.fileName || "Unknown File"}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground flex gap-2">
+                                                        <span>{formatDate(log.createdAt)}</span>
+                                                        {log.meta?.fileSize && <span>• {formatBytes(log.meta.fileSize)}</span>}
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 font-mono text-[10px]">{log.tokens.total.toLocaleString()}</td>
+                                                <td className="p-2 text-right font-mono text-xs">{formatCurrency(log.totalCost, 6)}</td>
+                                            </tr>
+                                        ))}
+                                        {stats.logs.filter((l: any) => l.type === 'indexing').length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} className="p-8 text-center text-muted-foreground italic">No indexing records found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+
+                <Card className="flex flex-col">
+                    <CardHeader>
+                        <CardTitle>Chat History</CardTitle>
+                        <CardDescription>
+                            Consumption from RAG prompts and generations.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                        <ScrollArea className="h-[400px]">
+                            <div className="w-full">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="border-b">
+                                        <tr className="text-muted-foreground">
+                                            <th className="h-10 px-2 font-medium">Query / Date</th>
+                                            <th className="h-10 px-2 font-medium text-center">In/Out</th>
+                                            <th className="h-10 px-2 font-medium text-right">Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {stats.logs.filter((l: any) => l.type === 'chat').map((log: any) => (
+                                            <tr key={log._id} className="hover:bg-muted/50">
+                                                <td className="p-2">
+                                                    <div className="text-[10px] text-muted-foreground mb-1">{formatDate(log.createdAt)}</div>
+                                                    <div className="text-[10px]">
+                                                        {log.meta?.charCount ? (
+                                                            <span className="bg-blue-500/10 text-blue-500 px-1 rounded">{log.meta.charCount} chars</span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">Char count N/A</span>
+                                                        )}
+                                                        <span className="ml-2 font-mono opacity-60">{log.modelName}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="p-2 text-center font-mono text-[10px]">
+                                                    {log.tokens.input} / {log.tokens.output}
+                                                </td>
+                                                <td className="p-2 text-right font-mono text-xs">{formatCurrency(log.totalCost, 6)}</td>
+                                            </tr>
+                                        ))}
+                                        {stats.logs.filter((l: any) => l.type === 'chat').length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} className="p-8 text-center text-muted-foreground italic">No chat records found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </div>
 
             <Card>
                 <CardHeader>

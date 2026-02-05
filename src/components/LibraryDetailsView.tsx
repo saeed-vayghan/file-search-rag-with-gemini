@@ -107,7 +107,7 @@ export function LibraryDetailsView({ library, initialFiles }: LibraryDetailsView
                                             </div>
                                             {file.indexingCost !== undefined && (
                                                 <div className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 font-mono">
-                                                    {formatCurrency(file.indexingCost, 4)}
+                                                    {formatCurrency(file.indexingCost, 6)}
                                                 </div>
                                             )}
                                         </CardTitle>

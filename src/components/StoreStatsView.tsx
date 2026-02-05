@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Database, HardDrive, FileText, RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { formatBytes } from "@/lib/utils";
+import { formatBytes, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/lib/toast";
@@ -153,7 +153,7 @@ export function StoreStatsView({ initialStore }: StoreStatsViewProps) {
                             <span className="text-slate-400">Total Indexing Cost</span>
                             <div className="text-right">
                                 <div className="text-slate-100 font-medium font-mono">
-                                    ${(store.totalIndexingCost || 0).toFixed(5)}
+                                    {formatCurrency(store.totalIndexingCost || 0, 6)}
                                 </div>
                             </div>
                         </div>

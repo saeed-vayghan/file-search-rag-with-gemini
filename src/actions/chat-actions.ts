@@ -164,8 +164,8 @@ export const sendMessageAction = withAuth(async (
                 searchCount
             );
 
-            // Fire and forget log
-            UsageLog.create({
+            // Ensure log is preserved
+            await UsageLog.create({
                 userId: user._id,
                 type: "chat",
                 totalCost: costData.total,
@@ -176,7 +176,10 @@ export const sendMessageAction = withAuth(async (
                     total: usage.totalTokenCount || 0,
                 },
                 details: costData.details,
-                meta: { searchCount },
+                meta: {
+                    searchCount,
+                    charCount: newMessage.length
+                },
                 contextId
             }).catch(e => console.error(LOG_MESSAGES.CHAT.ACTION_FAIL + " (Cost Log)", e));
 

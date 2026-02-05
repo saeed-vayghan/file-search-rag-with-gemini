@@ -101,8 +101,7 @@ export async function importFileToStore(
             }
         });
 
-        return operation;
-
+        return operation; // Return the full operation object
     } catch (error) {
         console.error(LOG_MESSAGES.GOOGLE.INGEST_START_FAIL, error);
         throw error;
@@ -110,20 +109,35 @@ export async function importFileToStore(
 }
 
 /**
- * 4. Polls an operation until it is done.
+ * 3.5. Counts tokens for a file using a specific model.
+ * Used for estimating indexing costs.
  */
-export async function waitForOperation(operation0: any) {
+export async function countTokens(
+    fileUri: string,
+    mimeType: string,
+    modelName: string = "gemini-embedding-001"
+) {
     const aiClient = getAIClient();
+    try {
+        const response = await aiClient.models.countTokens({
+            model: modelName,
+            contents: [{
+                parts: [{
+                    fileData: {
+                        fileUri,
+                        mimeType
+                    }
+                }]
+            }]
+        });
 
-    let operation = await aiClient.operations.get({ operation: operation0 });
+        console.log("Counted", JSON.stringify(response));
 
-    while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        operation = await aiClient.operations.get({ operation });
-        console.log(`waitForOperation: ${JSON.stringify(operation)}`);
+        return response.totalTokens;
+    } catch (error) {
+        console.error("Failed to count tokens for file:", error);
+        return 0; // Fallback to 0 if counting fails
     }
-
-    return operation;
 }
 
 

@@ -5,6 +5,7 @@ import { Loader2, Server, AlertTriangle, X } from "lucide-react";
 import { getRemoteFileDebugAction } from "@/actions/file-actions";
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
+import { formatCurrency } from "@/lib/utils";
 import { ForceEnglishWrapper } from "@/components/ForceEnglishWrapper";
 
 
@@ -94,7 +95,7 @@ export function InspectFileModal({ fileId, fileName, isOpen, onClose }: InspectF
                                     <InfoItem label="Updated" value={new Date(data.updateTime).toLocaleString()} />
                                     <InfoItem label="URI" value={data.uri} />
                                     {data.indexingCost !== undefined && (
-                                        <InfoItem label="Indexing Cost" value={`$${data.indexingCost.toFixed(5)}`} />
+                                        <InfoItem label="Indexing Cost" value={formatCurrency(data.indexingCost, 6)} />
                                     )}
                                 </div>
 

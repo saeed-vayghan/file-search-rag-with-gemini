@@ -21,7 +21,7 @@ export function CodeEditor({ code, onChange }: CodeEditorProps) {
     };
 
     return (
-        <div className="h-full w-full bg-[#1e1e1e] border-r border-slate-700">
+        <div className="h-full w-full bg-[#1e1e1e]">
             <Editor
                 height="100%"
                 defaultLanguage="typescript"

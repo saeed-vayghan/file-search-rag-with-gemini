@@ -73,7 +73,7 @@ console.log(\`Searching in \${storeName}...\`);
 
 // Using structure from GoogleAIService.search
 const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview", // Using stable model for playground
+    model: "gemini-3-flash-preview", 
     contents: query,
     config: {
         tools: [{
@@ -89,6 +89,83 @@ const candidate = response.candidates?.[0];
 console.log("Grounding Metadata:", JSON.stringify(candidate?.groundingMetadata, null, 2));
 
 return response.text;
+`
+    },
+    {
+        id: 'indexing-cost',
+        category: 'Files',
+        name: 'File Indexing Cost',
+        description: 'Calculate tokens and cost for a specific file URI.',
+        code: `
+// 1. Specify the file details
+const fileUri = "https://generativelanguage.googleapis.com/v1beta/files/YOUR_FILE_ID";
+const mimeType = "application/pdf";
+
+console.log(\`Calculating tokens for: \${fileUri}...\`);
+
+// 2. Call countTokens on the specific model
+const response = await ai.models.countTokens({
+    model: "gemini-embedding-001",
+    contents: [{
+        parts: [{
+            fileData: {
+                fileUri: fileUri,
+                mimeType: mimeType
+            }
+        }]
+    }]
+});
+
+// 3. Extract and calculate ($0.15 per 1M tokens)
+const totalTokens = response.totalTokens;
+const indexingCost = (totalTokens / 1_000_000) * 0.15;
+
+console.log(\`File Tokens: \${totalTokens}\`);
+console.log(\`Estimated Indexing Cost: \$\${indexingCost.toFixed(6)}\`);
+
+return { totalTokens, indexingCost };
+`
+    },
+    {
+        id: 'chat-cost',
+        category: 'Stores',
+        name: 'Chat Consumption Analysis',
+        description: 'Analyze token usage and cost for a RAG turn.',
+        code: `
+const storeName = "fileSearchStores/YOUR_STORE_ID";
+const query = "What is this document about?";
+
+console.log(\`Sending RAG query to \${storeName}...\`);
+
+const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: query,
+    config: {
+        tools: [{
+            fileSearch: {
+                fileSearchStoreNames: [storeName],
+            }
+        }]
+    }
+});
+
+const usage = response.usageMetadata;
+console.log("Usage Metadata:", usage);
+
+// Standard Pricing Calculation
+const inputCost = (usage.promptTokenCount / 1_000_000) * 0.075; // $0.075/1M
+const outputCost = (usage.candidatesTokenCount / 1_000_000) * 0.3; // $0.30/1M
+const totalCost = inputCost + outputCost;
+
+console.log(\`Input: \${usage.promptTokenCount} tokens (\$\${inputCost.toFixed(6)})\`);
+console.log(\`Output: \${usage.candidatesTokenCount} tokens (\$\${outputCost.toFixed(6)})\`);
+console.log(\`Total Turn Cost: \$\${totalCost.toFixed(6)}\`);
+
+return {
+    text: response.text,
+    cost: totalCost,
+    tokens: usage.totalTokenCount
+};
 `
     }
 ];
