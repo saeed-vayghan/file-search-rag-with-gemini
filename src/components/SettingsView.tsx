@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, User, Key, Bell, Palette, MessageSquare } from "lucide-react";
+import { ArrowLeft, User, Key, Bell, Palette, MessageSquare, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -164,6 +164,20 @@ export function SettingsView({ userStats }: SettingsViewProps) {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Billing */}
+                <Link href="/billing" className="block">
+                    <Card className="hover:bg-slate-900/50 transition-colors cursor-pointer border-green-500/20">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <CreditCard className="h-4 w-4 text-green-400" /> API Usage & Billing
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-muted-foreground">Monitor your API costs, token usage, and consumption history.</p>
+                        </CardContent>
+                    </Card>
+                </Link>
 
                 {/* Preferences */}
                 <Card>

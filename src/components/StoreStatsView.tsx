@@ -20,6 +20,7 @@ interface StoreStatsViewProps {
         limitBytes: number;
         tier: string;
         lastSyncedAt: Date | string;
+        totalIndexingCost?: number;
     };
 }
 
@@ -147,6 +148,16 @@ export function StoreStatsView({ initialStore }: StoreStatsViewProps) {
                                 )}
                             </div>
                         </div>
+                        {/* Cost Row Added */}
+                        <div className="flex justify-between items-center text-sm py-2 border-b border-slate-800/50">
+                            <span className="text-slate-400">Total Indexing Cost</span>
+                            <div className="text-right">
+                                <div className="text-slate-100 font-medium font-mono">
+                                    ${(store.totalIndexingCost || 0).toFixed(5)}
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="flex justify-between items-center text-sm py-2 border-b border-slate-800/50">
                             <span className="text-slate-400">Cloud Provider</span>
                             <span className="text-slate-100 font-medium">Google Generative AI</span>

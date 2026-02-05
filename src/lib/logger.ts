@@ -82,10 +82,10 @@ export function logChatResponse(data: ChatResponseLog): void {
  * Log Google AI file operations
  */
 export function logFileOperation(data: FileOperationLog): void {
-    const module = "GoogleAI";
+    const moduleName = "GoogleAI";
     const operationText = data.operation.toUpperCase();
 
-    console.log(`${formatPrefix(module)} ${operationText}: ${data.fileName}${data.fileId ? ` (${data.fileId})` : ""}`);
+    console.log(`${formatPrefix(moduleName)} ${operationText}: ${data.fileName}${data.fileId ? ` (${data.fileId})` : ""}`);
 
     if (data.additionalInfo) {
         console.log(`   ${data.additionalInfo}`);
@@ -96,10 +96,10 @@ export function logFileOperation(data: FileOperationLog): void {
  * Log Google AI store operations
  */
 export function logStoreOperation(data: StoreOperationLog): void {
-    const module = "GoogleAI";
+    const moduleName = "GoogleAI";
     const operationText = data.operation.charAt(0).toUpperCase() + data.operation.slice(1);
 
-    console.log(`${formatPrefix(module)} ${operationText} Store: ${data.storeName}`);
+    console.log(`${formatPrefix(moduleName)} ${operationText} Store: ${data.storeName}`);
 
     if (data.additionalInfo) {
         console.log(`   ${data.additionalInfo}`);

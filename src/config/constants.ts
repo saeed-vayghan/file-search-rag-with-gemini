@@ -38,7 +38,8 @@ export const PATHS = {
     SETTINGS_CHAT_RULES: "/settings/chat-rules",
     STORE: "/store",
     AUTH_SIGNIN: "/auth/signin",
-    SEARCH: "/search"
+    SEARCH: "/search",
+    BILLING: "/billing"
 } as const;
 
 export const MESSAGES = {

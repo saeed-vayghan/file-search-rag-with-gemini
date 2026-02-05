@@ -10,7 +10,7 @@ import { DeleteHistoryModal } from "@/components/chat/DeleteHistoryModal";
 import { ChatCalendar } from "@/components/chat/ChatCalendar";
 import { DateSeparator } from "@/components/chat/DateSeparator";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { MessageRenderer } from "@/components/chat/MessageRenderer";
 import { CopyButton } from "@/components/chat/CopyButton";
@@ -26,6 +26,7 @@ type FileInfo = {
     date: string;
     mimeType: string;
     libraryId?: string;
+    indexingCost?: number;
 } | null;
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
@@ -152,7 +153,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     {
                         role: "assistant",
                         content: result.reply,
-                        citations: result.citations
+                        citations: result.citations,
+                        cost: result.cost,
+                        tokens: result.tokens
                     },
                 ]);
             }
@@ -299,6 +302,16 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                                         </div>
                                     </div>
 
+                                    {/* Cost (New) */}
+                                    {fileInfo.indexingCost !== undefined && (
+                                        <div className="bg-slate-800/50 rounded-lg p-4">
+                                            <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                                <span className="text-xs font-mono uppercase">Indexing Cost</span>
+                                            </div>
+                                            <p className="text-lg font-medium text-slate-200">{formatCurrency(fileInfo.indexingCost, 6)}</p>
+                                        </div>
+                                    )}
+
                                     {/* Status */}
                                     <div className="bg-slate-800/50 rounded-lg p-4">
                                         <div className="flex items-center gap-2">
@@ -384,7 +397,12 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                                             <div className="absolute top-2 right-2">
                                                 <CopyButton content={msg.content} />
                                             </div>
-                                            <MessageRenderer content={msg.content} role={msg.role} />
+                                            <MessageRenderer
+                                                content={msg.content}
+                                                role={msg.role}
+                                                cost={msg.cost}
+                                                tokens={msg.tokens}
+                                            />
 
                                             {/* Citations Block */}
                                             {msg.citations && msg.citations.length > 0 && (

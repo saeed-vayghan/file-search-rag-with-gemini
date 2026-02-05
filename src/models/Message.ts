@@ -10,6 +10,11 @@ export interface IMessage extends Document {
     content: string;
     citations?: { id: number; uri?: string; title?: string }[];
 
+
+    // Cost
+    cost?: number;
+    tokens?: number;
+
     createdAt: Date;
 }
 
@@ -54,6 +59,8 @@ const MessageSchema = new Schema<IMessage>(
             uri: String,
             title: String
         }],
+        cost: { type: Number },
+        tokens: { type: Number },
     },
     { timestamps: true }
 );

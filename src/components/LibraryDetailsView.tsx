@@ -19,6 +19,7 @@ type LibraryFile = {
     status: string;
     date: string;
     mimeType: string;
+    indexingCost?: number;
 };
 
 type LibraryMeta = {
@@ -33,6 +34,8 @@ interface LibraryDetailsViewProps {
     library: LibraryMeta;
     initialFiles: LibraryFile[];
 }
+
+import { formatCurrency } from "@/lib/utils";
 
 export function LibraryDetailsView({ library, initialFiles }: LibraryDetailsViewProps) {
     const { t, dir } = useI18n();
@@ -97,9 +100,16 @@ export function LibraryDetailsView({ library, initialFiles }: LibraryDetailsView
                             <Link key={file.id} href={`/chat/${file.id}`}>
                                 <Card className="hover:border-blue-500/50 transition-colors cursor-pointer h-full group">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-medium flex items-center gap-2 group-hover:text-blue-400 transition-colors">
-                                            <FileText className="h-4 w-4 text-slate-500" />
-                                            {file.displayName}
+                                        <CardTitle className="text-sm font-medium flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 group-hover:text-blue-400 transition-colors truncate">
+                                                <FileText className="h-4 w-4 text-slate-500 shrink-0" />
+                                                <span className="truncate">{file.displayName}</span>
+                                            </div>
+                                            {file.indexingCost !== undefined && (
+                                                <div className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 font-mono">
+                                                    {formatCurrency(file.indexingCost, 4)}
+                                                </div>
+                                            )}
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>

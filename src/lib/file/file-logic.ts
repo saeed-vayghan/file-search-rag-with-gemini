@@ -50,13 +50,14 @@ export function mapFileToUi(f: any) {
         libraryName: f.libraryId?.name || "Uncategorized",
         libraryIcon: f.libraryId?.icon || UI_DEFAULTS.LIBRARY.ICON,
         libraryId: f.libraryId?._id?.toString() || f.libraryId?.toString(),
+        indexingCost: f.indexingCost, // Added
     };
 }
 
 /**
  * Pure function to map DB store and user data to a unified status object.
  */
-export function mapStoreStatsToUi(store: any, localFileCount: number, userTier: string) {
+export function mapStoreStatsToUi(store: any, localFileCount: number, userTier: string, totalIndexingCost?: number) {
     const limits = TIERS[userTier as keyof typeof TIERS] || TIERS.TIER_1;
 
     return {
@@ -69,6 +70,7 @@ export function mapStoreStatsToUi(store: any, localFileCount: number, userTier: 
         limitBytes: limits.maxStoreSizeBytes,
         tier: limits.name,
         lastSyncedAt: store.lastSyncedAt,
+        totalIndexingCost: totalIndexingCost // Added
     };
 }
 

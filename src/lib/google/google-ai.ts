@@ -101,7 +101,8 @@ export async function importFileToStore(
             }
         });
 
-        return operation.name!; // "operations/..."
+        return operation;
+
     } catch (error) {
         console.error(LOG_MESSAGES.GOOGLE.INGEST_START_FAIL, error);
         throw error;
@@ -109,25 +110,22 @@ export async function importFileToStore(
 }
 
 /**
- * 4. Checks the status of an ingestion operation.
- * Note: The SDK expects the full operation object, not just the name.
+ * 4. Polls an operation until it is done.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getOperationStatus(
-    operation: any
-) {
+export async function waitForOperation(operation0: any) {
     const aiClient = getAIClient();
-    try {
-        const op = await aiClient.operations.get({ operation });
-        return {
-            done: op.done,
-            metadata: op.metadata
-        };
-    } catch (error) {
-        console.error(LOG_MESSAGES.GOOGLE.OP_STATUS_FAIL, error);
-        throw error;
+
+    let operation = await aiClient.operations.get({ operation: operation0 });
+
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        operation = await aiClient.operations.get({ operation });
+        console.log(`waitForOperation: ${JSON.stringify(operation)}`);
     }
+
+    return operation;
 }
+
 
 /**
  * 5. Performs a RAG Search.
@@ -152,7 +150,9 @@ export async function search(
 
         return {
             text: response.text,
-            citations: parseGroundingCitations(response.candidates?.[0]?.groundingMetadata)
+            citations: parseGroundingCitations(response.candidates?.[0]?.groundingMetadata),
+            usageMetadata: response.usageMetadata,
+            groundingMetadata: response.candidates?.[0]?.groundingMetadata
         };
     } catch (error: any) {
         console.error(LOG_MESSAGES.GOOGLE.SEARCH_FAIL, error);
@@ -195,9 +195,6 @@ export async function deleteDocumentFromStore(
     const aiClient = getAIClient();
     logInfo("GoogleAI", `Attempting to remove file ${googleFileId} from store ${storeName}`);
     try {
-        // clean ID: "files/abc" -> "abc"
-        const cleanId = googleFileId.replace("files/", "");
-
         // 1. List documents in the store to find the one derived from this file
         // Note: The SDK expects 'parent' or similar. 
         // In the REST API, it is GET v1beta/{parent=projects/*/locations/*/fileSearchStores/*}/documents

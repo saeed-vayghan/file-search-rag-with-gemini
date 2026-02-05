@@ -93,6 +93,9 @@ export function InspectFileModal({ fileId, fileName, isOpen, onClose }: InspectF
                                     <InfoItem label="Created" value={new Date(data.createTime).toLocaleString()} />
                                     <InfoItem label="Updated" value={new Date(data.updateTime).toLocaleString()} />
                                     <InfoItem label="URI" value={data.uri} />
+                                    {data.indexingCost !== undefined && (
+                                        <InfoItem label="Indexing Cost" value={`$${data.indexingCost.toFixed(5)}`} />
+                                    )}
                                 </div>
 
                                 <div className="space-y-1">

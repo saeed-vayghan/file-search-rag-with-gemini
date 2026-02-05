@@ -84,7 +84,7 @@ export function FileUploadForm() {
 
             if (duplicate.exists) {
                 setStatus("error");
-                // @ts-ignore
+                // @ts-expect-error - i18n types might be loose
                 setErrorMessage(t.upload.duplicateError?.replace("{name}", duplicate.file?.name || "") || `Duplicate of: ${duplicate.file?.name}`);
                 return;
             }

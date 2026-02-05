@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MESSAGES } from "@/config/constants";
@@ -25,7 +25,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const toast = (props: Omit<Toast, "id">) => {
-        const id = Math.random().toString(36).substring(2, 9);
+        const id = crypto.randomUUID();
         const newToast = { id, ...props };
         setToasts((prev) => [...prev, newToast]);
 

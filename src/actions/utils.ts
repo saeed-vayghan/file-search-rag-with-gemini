@@ -11,6 +11,8 @@ import { join } from "path";
 import { LIBRARY_DEFAULTS, UI_DEFAULTS, PATHS, LOG_MESSAGES, MESSAGES } from "@/config/constants";
 import { classifyGoogleError, GOOGLE_ERROR_TYPES } from "@/lib/file";
 import Message from "@/models/Message";
+import UsageLog from "@/models/UsageLog";
+import { calculateIndexingCost } from "@/lib/cost-calculator";
 
 /**
  * Helper: Ensures the user has a valid Store record.
@@ -75,14 +77,63 @@ export async function importFileWithRetry(
     googleFileId: string,
     metadata: { libraryId: string, dbFileId: string },
     user: any
-): Promise<{ operationName: string, updatedStore?: any }> {
+) {
     try {
-        const opName = await GoogleAIService.importFileToStore(
+        const operation = await GoogleAIService.importFileToStore(
             store.googleStoreId,
             googleFileId,
             metadata
         );
-        return { operationName: opName };
+
+        console.log(`importFileWithRetry: ${JSON.stringify(operation)}`);
+
+        let completedOp
+
+        // --- NEW: Poll for completion and Cost Calculation ---
+        try {
+            completedOp = await GoogleAIService.waitForOperation(operation);
+
+            console.log(`Polling completedOp (try): ${JSON.stringify(completedOp)}`);
+
+            // Extract tokens (Google uses this for billing: $0.15/1M tokens)
+            // @ts-ignore - metadata is generic
+            const totalTokens = Number(completedOp.metadata?.totalTokens || 0);
+
+            if (totalTokens > 0) {
+                const cost = calculateIndexingCost(totalTokens);
+
+                // 1. Log Usage
+                await UsageLog.create({
+                    userId: user._id,
+                    type: "indexing",
+                    totalCost: cost,
+                    modelName: "gemini-embedding-001",
+                    tokens: { input: totalTokens, output: 0, total: totalTokens },
+                    details: { tokenCost: cost, searchCost: 0, isTier2: false },
+                    meta: { operationName: operation.name },
+                    contextId: metadata.dbFileId
+                });
+
+                // 2. Update File Document with Cost & Status
+                await FileModel.findByIdAndUpdate(metadata.dbFileId, {
+                    indexingTokens: totalTokens,
+                    indexingCost: cost,
+                    status: "ACTIVE" // Mark as active immediately since we verified it's done
+                });
+            } else {
+                // Even if tokens are 0 (unlikely), mark as active if done
+                await FileModel.findByIdAndUpdate(metadata.dbFileId, {
+                    status: "ACTIVE"
+                });
+            }
+        } catch (pollError) {
+            console.error("Polling/Cost logging failed during import:", pollError);
+            // Don't throw, let the function return success so the UI doesn't break.
+            // checkFileStatusAction will handle status updates if this failed.
+        }
+
+        return completedOp;
+
     } catch (error: any) {
         const errorType = classifyGoogleError(error);
         if (errorType !== GOOGLE_ERROR_TYPES.STORE_EXPIRED && errorType !== GOOGLE_ERROR_TYPES.STORE_NOT_FOUND) {
@@ -100,12 +151,48 @@ export async function importFileWithRetry(
         store.lastSyncedAt = new Date();
         const updatedStore = await store.save();
 
-        const opName = await GoogleAIService.importFileToStore(
+        const operation = await GoogleAIService.importFileToStore(
             newGoogleStoreName,
             googleFileId,
             metadata
         );
-        return { operationName: opName, updatedStore };
+
+        let completedOp;
+
+        // --- NEW: Poll for completion and Cost Calculation (Retry Path) ---
+        try {
+            completedOp = await GoogleAIService.waitForOperation(operation);
+            console.log(`Polling completedOp (retry): ${completedOp}`);
+
+            // @ts-ignore
+            const totalTokens = Number(completedOp.metadata?.totalTokens || 0);
+
+            if (totalTokens > 0) {
+                const cost = calculateIndexingCost(totalTokens);
+                await UsageLog.create({
+                    userId: user._id,
+                    type: "indexing",
+                    totalCost: cost,
+                    modelName: "gemini-embedding-001",
+                    tokens: { input: totalTokens, output: 0, total: totalTokens },
+                    details: { tokenCost: cost, searchCost: 0, isTier2: false },
+                    meta: { operationName: completedOp.name },
+                    contextId: metadata.dbFileId
+                });
+
+                await FileModel.findByIdAndUpdate(metadata.dbFileId, {
+                    indexingTokens: totalTokens,
+                    indexingCost: cost,
+                    status: "ACTIVE"
+                });
+            } else {
+                await FileModel.findByIdAndUpdate(metadata.dbFileId, { status: "ACTIVE" });
+            }
+        } catch (pollError) {
+            console.error("Polling/Cost logging failed during import retry:", pollError);
+        }
+
+        return completedOp
     }
 }
 

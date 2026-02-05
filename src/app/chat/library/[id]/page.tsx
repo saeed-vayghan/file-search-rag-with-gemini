@@ -121,7 +121,9 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
                     {
                         role: "assistant",
                         content: result.reply,
-                        citations: result.citations
+                        citations: result.citations,
+                        cost: result.cost,
+                        tokens: result.tokens
                     },
                 ]);
             }
@@ -207,7 +209,12 @@ export default function LibraryChatPage({ params }: { params: Promise<{ id: stri
                                             <div className="absolute top-2 right-2">
                                                 <CopyButton content={msg.content} />
                                             </div>
-                                            <MessageRenderer content={msg.content} role={msg.role} />
+                                            <MessageRenderer
+                                                content={msg.content}
+                                                role={msg.role}
+                                                cost={msg.cost}
+                                                tokens={msg.tokens}
+                                            />
                                             {/* Citations Block */}
                                             {msg.citations && msg.citations.length > 0 && (
                                                 <div className="mt-3 pt-3 border-t border-slate-700/50">

@@ -27,6 +27,7 @@ interface DashboardFile {
     libraryName?: string;
     libraryIcon?: string;
     libraryId?: string;
+    indexingCost?: number;
 }
 
 interface DashboardViewProps {
@@ -255,6 +256,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                                     <th className="h-10 px-4 font-medium text-start">{t.dashboard.type}</th>
                                     <th className="h-10 px-4 font-medium text-start">{t.dashboard.date}</th>
                                     <th className="h-10 px-4 font-medium text-start">{t.dashboard.sizeCol}</th>
+                                    <th className="h-10 px-4 font-medium text-start">Cost</th>
                                     <th className="h-10 px-4 font-medium text-start">{t.dashboard.status}</th>
                                     <th className="h-10 px-4 font-medium text-end">{t.actions.checkStatus}</th>
                                 </tr>
@@ -262,7 +264,7 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                             <tbody>
                                 {files.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
                                             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                             <p>{t.dashboard.noFiles}</p>
                                             <p className="text-xs">{t.dashboard.uploadFirst}</p>
@@ -295,6 +297,9 @@ export function DashboardView({ files, userStats, libraries }: DashboardViewProp
                                             <td className="p-4 text-muted-foreground">{file.type}</td>
                                             <td className="p-4 text-muted-foreground">{file.date}</td>
                                             <td className="p-4 text-muted-foreground">{file.size}</td>
+                                            <td className="p-4 text-muted-foreground font-mono text-xs">
+                                                {file.indexingCost ? `$${file.indexingCost.toFixed(5)}` : '-'}
+                                            </td>
                                             <td className="p-4">
                                                 <StatusBadge status={file.status as FileStatus} />
                                             </td>

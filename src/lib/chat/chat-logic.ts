@@ -1,4 +1,4 @@
-import { CHAT_CONSTANTS, CHAT_MODES, ChatModeType, ChatScopeType } from "@/config/constants";
+import { CHAT_CONSTANTS, CHAT_MODES, ChatModeType } from "@/config/constants";
 import { MESSAGES } from "@/config/constants";
 
 
@@ -77,6 +77,8 @@ export function mapMessageToUi(m: any) {
             uri: c.uri,
             title: c.title
         })),
+        cost: m.cost,
+        tokens: m.tokens,
         createdAt: m.createdAt.toISOString(),
     };
 }

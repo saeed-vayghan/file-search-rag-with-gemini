@@ -34,9 +34,12 @@ export function ConfirmModal({
 
     useEffect(() => {
         if (isOpen) {
-            setIsVisible(true);
+            // Delay slightly to allow animation
+            const timer = setTimeout(() => setIsVisible(true), 10);
+            return () => clearTimeout(timer);
         } else {
-            setTimeout(() => setIsVisible(false), 200); // Wait for animation
+            const timer = setTimeout(() => setIsVisible(false), 200); // Wait for animation
+            return () => clearTimeout(timer);
         }
     }, [isOpen]);
 

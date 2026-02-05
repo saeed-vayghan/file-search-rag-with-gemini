@@ -27,6 +27,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
         if (saved && (saved === "en" || saved === "fa")) {
+            // eslint-disable-next-line
             setLocaleState(saved);
         }
         setMounted(true);

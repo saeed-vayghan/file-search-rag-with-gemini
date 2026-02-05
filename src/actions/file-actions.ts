@@ -19,6 +19,7 @@ import Message from "@/models/Message";
 import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
 import { formatBytes } from "@/lib/utils";
 import { ensureUserStore, resolveLibraryId, importFileWithRetry, deleteFileInternal } from "./utils";
+import UsageLog from "@/models/UsageLog";
 
 
 export const checkFileDuplicate = withAuth(async (user, hash: string, libraryId?: string) => {
@@ -107,16 +108,12 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         const uploadRes = await GoogleAIService.uploadFile(tempPath, file.name, file.type);
 
         // 7. Ingestion with Auto-Recovery
-        const { operationName, updatedStore } = await importFileWithRetry(
+        const operation = await importFileWithRetry(
             store,
             uploadRes.name,
             { libraryId, dbFileId: newFileId! },
             user
         );
-
-        if (updatedStore) {
-            store = updatedStore;
-        }
 
         // 8. Local Preview Storage
         const { relativePath, absolutePath } = generateLocalFilePath(
@@ -135,7 +132,7 @@ export const uploadFileAction = withAuth(async (user, formData: FormData) => {
         newFile.status = "INGESTING";
         newFile.googleFileId = uploadRes.name;
         newFile.googleUri = uploadRes.uri;
-        newFile.googleOperationName = operationName;
+        newFile.googleOperationName = operation?.name;
         newFile.localPath = relativePath;
         await newFile.save();
 
@@ -193,7 +190,10 @@ export const getFilesAction = withAuth(async (user, libraryId?: string): Promise
         }
 
         return {
-            files: files.map(mapFileToUi),
+            files: files.map(f => ({
+                ...mapFileToUi(f),
+                indexingCost: f.indexingCost
+            })),
             library: libraryData || undefined
         };
     } catch (error) {
@@ -252,7 +252,6 @@ export const getUserStatsAction = withAuth(async (user) => {
 
 
 export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
-
     try {
         const file = await FileModel.findOne({ _id: fileId, userId: user._id });
         if (!file) {
@@ -267,18 +266,23 @@ export const checkFileStatusAction = withAuth(async (user, fileId: string) => {
             };
         }
 
-        // Check with Google API if we have an operation
-        if (file.googleOperationName) {
-            // Note: In the real implementation, we'd call getOperationStatus
-            // For now, we'll mark as ACTIVE after checking
-            file.status = FILE_STATUS.ACTIVE;
-            await file.save();
+        if (file.googleFileId) {
+            const remoteFile = await GoogleAIService.getFile(file.googleFileId);
 
-            revalidatePath(PATHS.HOME);
-            return {
-                status: FILE_STATUS.ACTIVE,
-                message: MESSAGES.SUCCESS.FILE_READY
-            };
+            if (remoteFile) {
+                if (remoteFile.state === "ACTIVE") {
+                    file.status = FILE_STATUS.ACTIVE;
+                    await file.save();
+                    revalidatePath(PATHS.HOME);
+                    return { status: FILE_STATUS.ACTIVE, message: MESSAGES.SUCCESS.FILE_READY };
+
+                } else if (remoteFile.state === "FAILED") {
+                    file.status = FILE_STATUS.FAILED;
+                    await file.save();
+                    revalidatePath(PATHS.HOME);
+                    return { status: FILE_STATUS.FAILED, message: MESSAGES.ERRORS.INGESTION_FAILED };
+                }
+            }
         }
 
         return {
@@ -309,7 +313,14 @@ export const getRemoteFileDebugAction = withAuth(async (user, fileId: string) =>
             return { error: MESSAGES.ERRORS.FILE_NOT_FOUND_REMOTE };
         }
 
-        return { success: true, metadata: remoteMeta };
+        return {
+            success: true,
+            metadata: {
+                ...remoteMeta,
+                indexingCost: file.indexingCost,
+                indexingTokens: file.indexingTokens
+            }
+        };
     } catch (error) {
         return { error: MESSAGES.ERRORS.INSPECT_REMOTE_FAILED };
     }
@@ -340,10 +351,15 @@ export const getStoreStatusAction = withAuth(async (user, force: boolean = false
         const userTier = (user.tier || DEFAULT_TIER) as TierKey;
         const localFileCount = await FileModel.countDocuments({ userId: user._id });
 
+        // Calculate total indexing cost of active files
+        const files = await FileModel.find({ userId: user._id }).select("indexingCost");
+        const totalIndexingCost = files.reduce((sum, f) => sum + (f.indexingCost || 0), 0);
+
         return {
             success: true,
-            store: mapStoreStatsToUi(store, localFileCount, userTier)
+            store: mapStoreStatsToUi(store, localFileCount, userTier, totalIndexingCost)
         };
+
     } catch (error) {
         console.error(LOG_MESSAGES.FILE.GET_STORE_STATUS_FAIL, error);
         return { error: MESSAGES.ERRORS.FETCH_STORE_STATUS_FAILED };
@@ -361,6 +377,7 @@ export const purgeUserDataAction = withAuth(async (user) => {
         await FileModel.deleteMany({}); // Purge all file records
         await Library.deleteMany({}); // Purge all libraries
         await Store.deleteMany({}); // Purge all store records
+        await UsageLog.deleteMany({}); // Purge all usage logs
 
         // Reset User state but keep the user record (simulation of "Account Reset")
         user.primaryStoreId = undefined;

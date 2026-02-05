@@ -23,6 +23,10 @@ export interface IFile extends Document {
     // Deduplication
     contentHash?: string;
 
+    // Cost Attribution
+    indexingCost?: number;
+    indexingTokens?: number;
+
     createdAt: Date;
     updatedAt: Date;
 }
@@ -44,6 +48,8 @@ const FileSchema: Schema<IFile> = new Schema(
         googleOperationName: { type: String },
         localPath: { type: String },
         contentHash: { type: String, required: false, index: true },
+        indexingCost: { type: Number },
+        indexingTokens: { type: Number },
     },
     { timestamps: true }
 );

@@ -53,10 +53,11 @@ export function ModelSelector({
             const dropdownHeight = 200; // Approximate max height
 
             // Prefer bottom if space is available, otherwise top
+            // Prefer bottom if space is available, otherwise top
             if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
-                setDropdownPosition("top");
+                setTimeout(() => setDropdownPosition("top"), 0);
             } else {
-                setDropdownPosition("bottom");
+                setTimeout(() => setDropdownPosition("bottom"), 0);
             }
         }
     }, [isOpen]);

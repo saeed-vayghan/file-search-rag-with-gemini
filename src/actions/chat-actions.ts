@@ -1,5 +1,7 @@
 "use server";
 
+import mongoose from "mongoose";
+
 import User from "@/models/User";
 import FileModel from "@/models/File";
 import Library from "@/models/Library";
@@ -11,12 +13,16 @@ import { MESSAGES, LOG_MESSAGES, CHAT_SCOPES, CHAT_ROLES, CHAT_MODES, ChatScopeT
 import { revalidatePath } from "next/cache";
 import { resolveSystemInstruction, extractGoogleFileIdsFromCitations, enrichCitationsWithFileNames, mapMessageToUi } from "@/lib/chat";
 import { RATE_LIMIT_CONFIG } from "@/config/ratelimit";
+import UsageLog from "@/models/UsageLog";
+import { calculateChatCost } from "@/lib/cost-calculator";
 
 export type ChatMessage = {
     id?: string;
     role: ChatRoleType;
     content: string;
     citations?: { id: number; uri?: string; title?: string }[];
+    cost?: number;
+    tokens?: number;
     createdAt?: string;
 };
 
@@ -51,6 +57,8 @@ async function persistMessage(data: {
     mode: ChatModeType;
     contextId: string;
     citations?: any[];
+    cost?: number;
+    tokens?: number;
 }) {
     const messageData: any = {
         role: data.role,
@@ -59,9 +67,15 @@ async function persistMessage(data: {
         mode: data.mode,
         userId: data.userId,
         citations: data.citations,
+        cost: data.cost,
+        tokens: data.tokens,
     };
-    if (data.scope === CHAT_SCOPES.FILE) messageData.fileId = data.contextId;
-    if (data.scope === CHAT_SCOPES.LIBRARY) messageData.libraryId = data.contextId;
+    if (data.scope === CHAT_SCOPES.FILE && data.contextId) {
+        messageData.fileId = new mongoose.Types.ObjectId(data.contextId);
+    }
+    if (data.scope === CHAT_SCOPES.LIBRARY && data.contextId) {
+        messageData.libraryId = new mongoose.Types.ObjectId(data.contextId);
+    }
 
     return await Message.create(messageData);
 }
@@ -105,8 +119,9 @@ export const sendMessageAction = withAuth(async (
     newMessage: string,
     mode?: ChatModeType,
     modelName?: string
-): Promise<{ reply: string; citations?: any[]; error?: string }> => {
+): Promise<{ reply: string; citations?: any[]; cost?: number; tokens?: number; error?: string }> => {
     try {
+        let persistedUsage: { cost?: number; tokens?: number } | null = null;
         // 1. Validate Store
         const googleStoreId = await getValidStoreId(user._id);
 
@@ -136,6 +151,42 @@ export const sendMessageAction = withAuth(async (
         );
         const replyText = result.text || MESSAGES.INFO.NO_RELEVANT_INFO;
 
+        // --- NEW: Cost Calculation & Logging ---
+        if (result.usageMetadata) {
+            const usage = result.usageMetadata;
+            const searchCount = result.groundingMetadata?.webSearchQueries?.length || 0;
+            const activeModel = modelName || "gemini-3-flash-preview"; // Default fallback
+
+            const costData = calculateChatCost(
+                activeModel,
+                usage.promptTokenCount || 0,
+                usage.candidatesTokenCount || 0,
+                searchCount
+            );
+
+            // Fire and forget log
+            UsageLog.create({
+                userId: user._id,
+                type: "chat",
+                totalCost: costData.total,
+                modelName: activeModel,
+                tokens: {
+                    input: usage.promptTokenCount || 0,
+                    output: usage.candidatesTokenCount || 0,
+                    total: usage.totalTokenCount || 0,
+                },
+                details: costData.details,
+                meta: { searchCount },
+                contextId
+            }).catch(e => console.error(LOG_MESSAGES.CHAT.ACTION_FAIL + " (Cost Log)", e));
+
+            persistedUsage = {
+                cost: costData.total,
+                tokens: usage.totalTokenCount || 0
+            };
+        }
+        // ---------------------------------------
+
         logChatResponse({
             chatMode: requestedMode,
             replyLength: replyText.length,
@@ -143,7 +194,7 @@ export const sendMessageAction = withAuth(async (
             replyPreview: replyText.substring(0, 100) + (replyText.length > 100 ? '...' : ''),
         });
 
-        // 5. Enrich & Save Assistant Message
+        // 5. Enrich & Save Assistant Message (Single Point of Persistence)
         const enrichedCitations = await resolveCitations(result.citations || []);
 
         await persistMessage({
@@ -153,12 +204,19 @@ export const sendMessageAction = withAuth(async (
             mode: requestedMode,
             userId: user._id,
             contextId,
-            citations: enrichedCitations
+            citations: enrichedCitations,
+            cost: persistedUsage?.cost,
+            tokens: persistedUsage?.tokens
         });
 
         if (scope === CHAT_SCOPES.FILE) revalidatePath(`/chat/${contextId}`);
 
-        return { reply: replyText, citations: enrichedCitations };
+        return {
+            reply: replyText,
+            citations: enrichedCitations,
+            cost: persistedUsage?.cost,
+            tokens: persistedUsage?.tokens
+        };
     } catch (error: any) {
         console.error(LOG_MESSAGES.CHAT.ACTION_FAIL, error);
         return {

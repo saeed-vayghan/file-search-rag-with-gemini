@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FolderOpen, Settings, FileText, Search, Database, AlertTriangle, FlaskConical, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderOpen, Settings, FileText, Search, Database, AlertTriangle, FlaskConical, LogOut, CreditCard } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useSession, signOut } from "next-auth/react";
@@ -19,6 +19,7 @@ export function Sidebar() {
         { label: t.nav.search, icon: Search, href: "/search" },
         { label: t.nav.libraries, icon: FolderOpen, href: "/libraries" },
         { label: t.nav.store, icon: Database, href: "/store" },
+        { label: "Billing", icon: CreditCard, href: "/billing" },
         { label: "Ask AI", icon: Search, href: "/chat/global" },
         { label: "Playground", icon: FlaskConical, href: "/playground" },
         { label: t.nav.settings, icon: Settings, href: "/settings" },
