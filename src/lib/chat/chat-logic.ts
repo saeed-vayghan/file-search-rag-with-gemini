@@ -1,17 +1,7 @@
 import { CHAT_CONSTANTS, CHAT_MODES, ChatModeType, ChatScopeType } from "@/config/constants";
 import { MESSAGES } from "@/config/constants";
 
-/**
- * Pure function to construct a metadata filter for Google AI based on search scope.
- */
-export function constructRAGFilter(scope?: { type: ChatScopeType; id?: string }): string | undefined {
-    if (scope?.type === 'library' && scope.id) {
-        return `library_id = "${scope.id}"`;
-    } else if (scope?.type === 'file' && scope.id) {
-        return `db_file_id = "${scope.id}"`;
-    }
-    return undefined;
-}
+
 
 /**
  * Pure function to parse and shape grounding metadata from Google AI response.

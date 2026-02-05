@@ -2,7 +2,8 @@ import { GoogleGenAI } from "@google/genai";
 import { stat } from "fs/promises";
 import { logFileOperation, logStoreOperation, logDangerousOperation, logInfo } from "@/lib/logger";
 import { MESSAGES, LOG_MESSAGES } from "@/config/constants";
-import { translateGoogleError, constructRAGFilter, parseGroundingCitations } from "@/lib/chat";
+import { translateGoogleError, parseGroundingCitations } from "@/lib/chat";
+import { resolveTools } from "./tools";
 import { findMatchingDocument } from "@/lib/file";
 
 if (!process.env.GOOGLE_API_KEY) {
@@ -141,19 +142,12 @@ export async function search(
 ) {
     const aiClient = getAIClient();
     try {
-        const metadataFilter = constructRAGFilter(scope);
-
         const response = await aiClient.models.generateContent({
             model: MODEL_NAME,
             contents: query,
             config: {
                 systemInstruction: systemInstruction,
-                tools: [{
-                    fileSearch: {
-                        fileSearchStoreNames: [storeName],
-                        metadataFilter
-                    } as any
-                }]
+                tools: resolveTools({ storeName, scope })
             }
         });
 
