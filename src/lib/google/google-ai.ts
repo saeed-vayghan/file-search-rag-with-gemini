@@ -149,7 +149,7 @@ export async function search(
     query: string,
     scope?: { type: 'global' | 'library' | 'file', id?: string },
     systemInstruction?: string,
-    modelName: string = "gemini-3-flash-preview"
+    modelName: string = "gemini-3.5-flash"
 ) {
     const aiClient = getAIClient();
     try {

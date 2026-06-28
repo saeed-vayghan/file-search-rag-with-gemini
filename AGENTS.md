@@ -6,7 +6,8 @@ This document outlines the rules, architectural patterns, and development guidel
 
 ## 🏛️ Architecture & Stack
 
-- **Framework**: Next.js 15 (App Router, React Server Components, Server Actions).
+- **Framework**: Next.js 16 (App Router, React Server Components, Server Actions).
+- **Runtime**: Node.js 22.22.2 (Pinned in package.json engines).
 - **Database**: MongoDB (via Mongoose ODM) with collections:
   - `User`: Accounts and tier settings (`FREE`, `TIER_1`, `TIER_2`, `TIER_3`).
   - `Store`: Tracks Google Vector Store mappings (`fileSearchStores/...`).

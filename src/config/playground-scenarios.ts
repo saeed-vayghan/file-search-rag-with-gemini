@@ -1,3 +1,16 @@
+/**
+ * 🤖 AGENT INSTRUCTIONS FOR UPDATING PLAYGROUND SCENARIOS 🤖
+ * 
+ * When asked to "update Gemini models" or "update pricing", future AI agents MUST 
+ * also review this file:
+ * 1. Synchronize Models: The hardcoded model strings in the `code` snippets (e.g., 
+ *    `gemini-3.5-flash`) must match the primary active models in `src/config/gemini-models.ts`.
+ * 2. Synchronize Pricing: The hardcoded pricing calculations in the `chat-cost` and 
+ *    `indexing-cost` scenarios (e.g., `* 1.50`, `* 9.00`, `* 0.15`) MUST exactly match 
+ *    the updated values in `src/config/pricing.ts`. Failure to update these will 
+ *    result in incorrect estimations in the UI playground.
+ */
+
 export interface PlaygroundScenario {
     id: string;
     category: 'Files' | 'Stores' | 'Operations';
@@ -73,7 +86,7 @@ console.log(\`Searching in \${storeName}...\`);
 
 // Using structure from GoogleAIService.search
 const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview", 
+    model: "gemini-3.5-flash", 
     contents: query,
     config: {
         tools: [{
@@ -138,7 +151,7 @@ const query = "What is this document about?";
 console.log(\`Sending RAG query to \${storeName}...\`);
 
 const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.5-flash",
     contents: query,
     config: {
         tools: [{
@@ -152,9 +165,9 @@ const response = await ai.models.generateContent({
 const usage = response.usageMetadata;
 console.log("Usage Metadata:", usage);
 
-// Standard Pricing Calculation
-const inputCost = (usage.promptTokenCount / 1_000_000) * 0.075; // $0.075/1M
-const outputCost = (usage.candidatesTokenCount / 1_000_000) * 0.3; // $0.30/1M
+// Standard Pricing Calculation for Gemini 3.5 Flash
+const inputCost = (usage.promptTokenCount / 1_000_000) * 1.50; // $1.50/1M
+const outputCost = (usage.candidatesTokenCount / 1_000_000) * 9.00; // $9.00/1M
 const totalCost = inputCost + outputCost;
 
 console.log(\`Input: \${usage.promptTokenCount} tokens (\$\${inputCost.toFixed(6)})\`);

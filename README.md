@@ -23,7 +23,7 @@ Read more to see how [Mitra](https://github.com/saeed-vayghan/mitra) Orchestrati
 
 ## 🛠️ Tech Stack
 
-*   **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
+*   **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
 *   **Database**: [MongoDB](https://www.mongodb.com/) (Mongoose ODM)
 *   **AI Engine**: [Google Gemini API](https://ai.google.dev/) (`@google/genai`)
 *   **Styling**: Tailwind CSS + Shadcn/Radix UI
@@ -31,7 +31,7 @@ Read more to see how [Mitra](https://github.com/saeed-vayghan/mitra) Orchestrati
 
 ## 📦 Prerequisites
 
-*   Node.js 18+
+*   Node.js 22.22.2 (Pinned)
 *   Docker (for local MongoDB)
 *   Google AI Studio API Key
 
@@ -114,7 +114,7 @@ This project includes a dedicated Playground to safely test Google's File API wi
 **Capabilities**:
 *   **List Files**: View all files currently uploaded to your Google Cloud project.
 *   **Manage Stores**: Create, list, and inspect Vector Stores.
-*   **RAG Probe**: Test semantic search queries against specific stores using `gemini-1.5-flash`.
+*   **RAG Probe**: Test semantic search queries against specific stores using `gemini-3.5-flash`.
 *   **Code Sandbox**: Edit the TypeScript code in the in-browser Monaco editor and run it server-side.
 
 ## 📂 Project Structure

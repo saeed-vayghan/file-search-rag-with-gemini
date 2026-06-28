@@ -155,7 +155,7 @@ export const sendMessageAction = withAuth(async (
         if (result.usageMetadata) {
             const usage = result.usageMetadata;
             const searchCount = result.groundingMetadata?.webSearchQueries?.length || 0;
-            const activeModel = modelName || "gemini-3-flash-preview"; // Default fallback
+            const activeModel = modelName || "gemini-3.5-flash"; // Default fallback
 
             const costData = calculateChatCost(
                 activeModel,
