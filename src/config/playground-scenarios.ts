@@ -4,7 +4,7 @@
  * When asked to "update Gemini models" or "update pricing", future AI agents MUST 
  * also review this file:
  * 1. Synchronize Models: The hardcoded model strings in the `code` snippets (e.g., 
- *    `gemini-3.5-flash`) must match the primary active models in `src/config/gemini-models.ts`.
+ *    `gemini-3.7-flash`) must match the primary active models in `src/config/gemini-models.ts`.
  * 2. Synchronize Pricing: The hardcoded pricing calculations in the `chat-cost` and 
  *    `indexing-cost` scenarios (e.g., `* 1.50`, `* 9.00`, `* 0.15`) MUST exactly match 
  *    the updated values in `src/config/pricing.ts`. Failure to update these will 
@@ -86,7 +86,7 @@ console.log(\`Searching in \${storeName}...\`);
 
 // Using structure from GoogleAIService.search
 const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash", 
+    model: "gemini-3.7-flash", 
     contents: query,
     config: {
         tools: [{
@@ -118,7 +118,7 @@ console.log(\`Calculating tokens for: \${fileUri}...\`);
 
 // 2. Call countTokens on the specific model
 const response = await ai.models.countTokens({
-    model: "gemini-embedding-001",
+    model: "gemini-embedding-2",
     contents: [{
         parts: [{
             fileData: {
@@ -151,7 +151,7 @@ const query = "What is this document about?";
 console.log(\`Sending RAG query to \${storeName}...\`);
 
 const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash",
+    model: "gemini-3.7-flash",
     contents: query,
     config: {
         tools: [{
@@ -165,7 +165,7 @@ const response = await ai.models.generateContent({
 const usage = response.usageMetadata;
 console.log("Usage Metadata:", usage);
 
-// Standard Pricing Calculation for Gemini 3.5 Flash
+// Standard Pricing Calculation for Gemini 3.7 Flash
 const inputCost = (usage.promptTokenCount / 1_000_000) * 1.50; // $1.50/1M
 const outputCost = (usage.candidatesTokenCount / 1_000_000) * 9.00; // $9.00/1M
 const totalCost = inputCost + outputCost;

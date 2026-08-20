@@ -115,7 +115,7 @@ export async function importFileToStore(
 export async function countTokens(
     fileUri: string,
     mimeType: string,
-    modelName: string = "gemini-embedding-001"
+    modelName: string = "gemini-embedding-2"
 ) {
     const aiClient = getAIClient();
     try {
@@ -149,7 +149,7 @@ export async function search(
     query: string,
     scope?: { type: 'global' | 'library' | 'file', id?: string },
     systemInstruction?: string,
-    modelName: string = "gemini-3.5-flash"
+    modelName: string = "gemini-3.7-flash"
 ) {
     const aiClient = getAIClient();
     try {

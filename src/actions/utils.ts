@@ -93,7 +93,7 @@ async function logIndexingUsage(
                 userId: user._id,
                 type: "indexing",
                 totalCost: cost,
-                modelName: "gemini-embedding-001",
+                modelName: "gemini-embedding-2",
                 tokens: { input: totalTokens, output: 0, total: totalTokens },
                 details: { tokenCost: cost, searchCost: 0, isTier2: false },
                 meta: {

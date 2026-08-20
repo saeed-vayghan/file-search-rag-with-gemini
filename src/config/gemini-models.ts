@@ -17,7 +17,7 @@
 
 export const queryModels = [
     {
-        "model": "gemini-3.5-flash",
+        "model": "gemini-3.7-flash",
         "query_hint": "The latest flagship Flash model; optimized for speed, multimodal tasks, and coding with high-performance agentic RAG capabilities."
     },
     {
@@ -25,7 +25,7 @@ export const queryModels = [
         "query_hint": "Use for 'Deep Thinking' tasks; best at connecting obscure dots across multiple retrieved chunks and handling highly complex reasoning."
     },
     {
-        "model": "gemini-3.1-flash-lite",
+        "model": "gemini-3.5-flash-lite",
         "query_hint": "Maximum cost savings; perfect for high-volume, simple retrieval tasks where speed and price are the priority."
     },
     {

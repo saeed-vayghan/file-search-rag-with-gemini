@@ -20,14 +20,14 @@
  */
 
 export const PRICING_RATES: Record<string, { in: number; inT2: number; out: number; outT2?: number }> = {
-    // Gemini 3.5 Flash
-    "gemini-3.5-flash": { in: 1.50, inT2: 1.50, out: 9.00, outT2: 9.00 },
+    // Gemini 3.7 Flash
+    "gemini-3.7-flash": { in: 1.50, inT2: 1.50, out: 9.00, outT2: 9.00 },
 
     // Gemini 3.1 Pro
     "gemini-3.1-pro-preview": { in: 2.00, inT2: 4.00, out: 12.00, outT2: 18.00 },
 
-    // Gemini 3.1 Flash-Lite
-    "gemini-3.1-flash-lite": { in: 0.10, inT2: 0.10, out: 0.40, outT2: 0.40 },
+    // Gemini 3.5 Flash-Lite
+    "gemini-3.5-flash-lite": { in: 0.10, inT2: 0.10, out: 0.40, outT2: 0.40 },
 
     // Gemini 2.5 Pro
     "gemini-2.5-pro": { in: 1.25, inT2: 2.50, out: 10.00, outT2: 15.00 },

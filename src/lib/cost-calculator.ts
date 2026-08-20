@@ -18,8 +18,8 @@ export function calculateChatCost(
     outputTokens: number,
     searchCount: number = 0
 ): CostBreakdown {
-    // Default to Gemini 3.5 Flash if model unknown
-    const rates = PRICING_RATES[modelId] || PRICING_RATES["gemini-3.5-flash"];
+    // Default to Gemini 3.7 Flash if model unknown
+    const rates = PRICING_RATES[modelId] || PRICING_RATES["gemini-3.7-flash"];
 
     // 1. Determine Input Cost (Tiered)
     const isTier2 = inputTokens > TIER_2_THRESHOLD;
