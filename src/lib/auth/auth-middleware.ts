@@ -78,8 +78,11 @@ export function withAuth<TArgs extends any[], TReturn>(
             }
 
             return await handler(user!, ...args);
-        } catch (error) {
-            console.error(LOG_MESSAGES.AUTH.ACTION_FAILED, error);
+        } catch (error: any) {
+            const isRedirect = error?.digest?.startsWith('NEXT_REDIRECT') || error?.message === 'NEXT_REDIRECT';
+            if (!isRedirect) {
+                console.error(LOG_MESSAGES.AUTH.ACTION_FAILED, error);
+            }
             throw error;
         }
     };
